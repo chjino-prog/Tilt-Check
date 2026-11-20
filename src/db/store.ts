@@ -5,8 +5,8 @@ export interface Block {
   id: string;
   ship: string; // 호선
   block: string; // 블록
-  ta: number; // T.A 횡단각
-  fa: number; // F.A FRAME각
+  ta: number; // T.A TRANSVERSE ANGLE
+  fa: number; // F.A FRAME ANGLE
   memo: string;
   createdAt: number;
   updatedAt: number;

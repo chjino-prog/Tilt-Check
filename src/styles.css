@@ -1134,3 +1134,77 @@ textarea.input {
 .spacer {
   flex: 1;
 }
+
+/* 폰 = 참고용 경고 */
+.warn-mark {
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  background: var(--orange-weak);
+  color: var(--orange);
+  margin-bottom: 16px;
+}
+.warn-mark svg {
+  width: 30px;
+  height: 30px;
+}
+.sheet .sub b {
+  color: var(--text);
+}
+.ref-note {
+  margin: 16px 20px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--orange-weak);
+  color: var(--text-2);
+  font-size: 13px;
+  word-break: keep-all;
+}
+.ref-note svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--orange);
+}
+.ref-note b {
+  color: var(--text);
+}
+
+/* 블록 설계값 (영문 표기 한 줄) */
+.angle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 4px 0;
+}
+.angle-row + .angle-row {
+  margin-top: 10px;
+}
+.angle-row .k {
+  font-size: 13px;
+  color: var(--text-3);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.angle-row .k b {
+  color: var(--text-2);
+  font-weight: 700;
+  margin-right: 4px;
+}
+.angle-row .v {
+  font-size: 24px;
+  font-weight: 700;
+}
+.angle-row .v small {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-3);
+  margin-left: 1px;
+}

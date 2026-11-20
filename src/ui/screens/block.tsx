@@ -62,21 +62,23 @@ export function BlockScreen(p: { id: string }) {
 
       <div class="section">
         <div class="card">
-          <div class="stat-grid">
-            <div class="stat">
-              <div class="k">T.A 횡단각</div>
-              <div class="v num">
-                {fmt(block.ta, 3)}
-                <small>°</small>
-              </div>
-            </div>
-            <div class="stat">
-              <div class="k">F.A FRAME각</div>
-              <div class="v num">
-                {fmt(block.fa, 3)}
-                <small>°</small>
-              </div>
-            </div>
+          <div class="angle-row">
+            <span class="k">
+              <b>T.A</b> TRANSVERSE ANGLE
+            </span>
+            <span class="v num">
+              {fmt(block.ta, 3)}
+              <small>°</small>
+            </span>
+          </div>
+          <div class="angle-row">
+            <span class="k">
+              <b>F.A</b> FRAME ANGLE
+            </span>
+            <span class="v num">
+              {fmt(block.fa, 3)}
+              <small>°</small>
+            </span>
           </div>
           {odd && <div class="note c-warn">0 &lt; F.A ≤ T.A &lt; 90° 가 아니에요. 정의를 확인해주세요.</div>}
         </div>

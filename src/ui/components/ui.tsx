@@ -2,7 +2,7 @@
 import type { ComponentChildren, JSX } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import { back } from '../router';
-import { IBack, IMore } from '../icons';
+import { IBack, IMore, IWarnFill } from '../icons';
 
 export function TopBar(p: { title?: string; backTo?: string; onMore?: () => void; right?: ComponentChildren }) {
   return (
@@ -210,6 +210,45 @@ export function Empty(p: { icon: () => JSX.Element; title: string; sub?: string 
       </div>
       <h3>{p.title}</h3>
       {p.sub && <p>{p.sub}</p>}
+    </div>
+  );
+}
+
+// ── 폰 센서는 참고용 경고
+let refWarnShown = false; // 앱을 켤 때마다 처음 측정 화면에서 한 번
+
+/** 측정 화면에 들어오면 한 번 띄우는 경고 시트 */
+export function RefWarningSheet() {
+  const [open, setOpen] = useState(!refWarnShown);
+  useEffect(() => {
+    refWarnShown = true;
+  }, []);
+  return (
+    <Sheet open={open} onClose={() => setOpen(false)}>
+      <div class="warn-mark">
+        <IWarnFill />
+      </div>
+      <h2>폰 측정값은 참고용이에요</h2>
+      <p class="sub">
+        폰 중력센서는 기기 · 케이스에 따라 0.1 ~ 0.5° 오차가 나요. <b>판정은 반드시 디지털 수평계로</b> 해주세요.
+        <br />
+        디지털 수평계 값은 ‘직접 입력’으로 넣으면 같은 계산을 해드려요.
+      </p>
+      <button class="btn" onClick={() => setOpen(false)}>
+        알겠어요
+      </button>
+    </Sheet>
+  );
+}
+
+/** 측정 · 결과 화면 아래 고정 안내 줄 */
+export function RefNote() {
+  return (
+    <div class="ref-note">
+      <IWarnFill />
+      <span>
+        폰 값은 참고용 · <b>판정은 디지털 수평계로</b>
+      </span>
     </div>
   );
 }

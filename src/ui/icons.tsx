@@ -24,6 +24,14 @@ export const ICheck = () => <S d="M5 12.5l4.5 4.5L19 7.5" w={2.6} />;
 export const IX = () => <S d="M6 6l12 12M18 6L6 18" w={2.6} />;
 export const IMinus = () => <S d="M6 12h12" w={2.6} />;
 export const IWarn = () => <S d={['M12 3.5l9.5 16.5h-19z', 'M12 10v4.5', 'M12 17.6v.1']} />;
+/** 채워진 경고 삼각형 */
+export const IWarnFill = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M10.3 3.9a2 2 0 0 1 3.4 0l8.1 14.1a2 2 0 0 1-1.7 3H3.9a2 2 0 0 1-1.7-3z" fill="currentColor" />
+    <path d="M12 9v5" stroke="#fff" stroke-width="2.2" stroke-linecap="round" />
+    <circle cx="12" cy="17.3" r="1.3" fill="#fff" />
+  </svg>
+);
 export const IInfo = () => <S d={['M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z', 'M12 11v5', 'M12 7.8v.1']} />;
 export const IShare = () => <S d={['M12 3v12', 'M7.5 7.5L12 3l4.5 4.5', 'M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6']} />;
 export const IEdit = () => <S d={['M4 20h4L19 9l-4-4L4 16z', 'M13.5 6.5l4 4']} />;

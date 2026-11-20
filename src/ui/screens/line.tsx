@@ -5,7 +5,7 @@ import { fmt, lineVerdict, parseNum } from '../../calc/judge';
 import { getBlock, newId, saveRecord, type Block } from '../../db/store';
 import { useSettings } from '../../settings';
 import { useWakeLock } from '../../sensor/tilt';
-import { Cta, Headline, NumInput, Seg, TopBar, toast } from '../components/ui';
+import { Cta, Headline, NumInput, RefNote, RefWarningSheet, Seg, TopBar, toast } from '../components/ui';
 import { ReadingCard, devOf, useMeasure } from '../components/reading';
 import { Gauge, LineFigure } from '../components/gauge';
 
@@ -114,7 +114,8 @@ export function LineScreen(p: { blockId: string }) {
           <input class="input" type="text" value={memo} placeholder="메모 (선택)" onInput={(e) => setMemo((e.target as HTMLInputElement).value)} />
         </div>
       )}
-      <div class="disclaimer">참고용이에요. 최종 판정은 디지털 각도기로 해주세요.</div>
+      <RefNote />
+      <RefWarningSheet />
       <Cta>
         {m.fixed == null ? (
           <button class="btn" disabled={m.manual || m.sensor.status !== 'running'} onClick={m.hold}>

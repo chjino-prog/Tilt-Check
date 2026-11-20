@@ -57,14 +57,12 @@ export function BlockSheet(p: { open: boolean; block?: Block | null; onClose: ()
           <TextInput value={name} onInput={setName} placeholder="예: A11P" />
         </Field>
       </div>
-      <div class="two-col">
-        <Field label="T.A 횡단각">
-          <NumInput value={ta} onInput={setTa} placeholder="0.000" unit="°" />
-        </Field>
-        <Field label="F.A FRAME각">
-          <NumInput value={fa} onInput={setFa} placeholder="0.000" unit="°" />
-        </Field>
-      </div>
+      <Field label="T.A TRANSVERSE ANGLE">
+        <NumInput value={ta} onInput={setTa} placeholder="0.000" unit="°" />
+      </Field>
+      <Field label="F.A FRAME ANGLE">
+        <NumInput value={fa} onInput={setFa} placeholder="0.000" unit="°" />
+      </Field>
       {odd && <div class="warn-text">보통은 0 &lt; F.A ≤ T.A &lt; 90° 예요. T.A · F.A 정의가 맞는지 확인해주세요.</div>}
       <Field label="메모 (선택)">
         <TextInput value={memo} onInput={setMemo} placeholder="위치 · 특이사항" />

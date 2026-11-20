@@ -6,7 +6,7 @@ import { deleteCap, getBlock, getCap, newId, saveRecord, type Block, type Cap } 
 import { setSettings, useSettings } from '../../settings';
 import { useWakeLock } from '../../sensor/tilt';
 import { back } from '../router';
-import { ConfirmSheet, Cta, Headline, MenuRow, NumInput, Sheet, TopBar, toast } from '../components/ui';
+import { ConfirmSheet, Cta, Headline, MenuRow, NumInput, RefNote, RefWarningSheet, Sheet, TopBar, toast } from '../components/ui';
 import { ReadingCard, devOf, useMeasure } from '../components/reading';
 import { Gauge, PlanFigure } from '../components/gauge';
 import { IBack, ICamera, ICheck, IEdit, IImage, IInfo, IMinus, IMore, ITrash, IWarn, IX } from '../icons';
@@ -284,7 +284,9 @@ function StepScreen(p: {
       )}
       <ReadingCard m={m} normal={p.normal} compareAbs={false} normalLabel="정상 대비" />
       <Gauge dev={dev} />
+      <RefNote />
       <div class="disclaimer">폰 케이스 · 카메라 돌출부 때문에 옆면이 뜨지 않게 대주세요</div>
+      <RefWarningSheet />
       <Cta>
         {m.fixed == null ? (
           <button class="btn" disabled={m.manual || !canHold} onClick={m.hold}>
@@ -403,6 +405,9 @@ function ResultScreen(p: {
         {verdict === '판정불가' && <p>B 실측값과 폰 방향(▲▼)을 다시 확인해주세요</p>}
       </div>
 
+      <RefNote />
+      <div style={{ height: '16px' }} />
+
       {residWarn && (
         <div class="banner">
           <IWarn />
@@ -498,8 +503,6 @@ function ResultScreen(p: {
           }}
         />
       </div>
-
-      <div class="disclaimer">참고용이에요. 최종 판정은 디지털 각도기로 해주세요.</div>
 
       <Cta>
         <button class="btn grey" onClick={p.onRetry}>
