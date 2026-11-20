@@ -12,7 +12,7 @@ FRAME · LONGL. · 임의 방향 라인을 재는 **일반 부재 측정**은 �
 
 ## 접속 · 홈 화면에 추가
 
-접속 주소 : `https://<GitHub아이디>.github.io/<저장소이름>/` (배포 후 확정)
+접속 주소 : **https://chjino-prog.github.io/Tilt-Check/**
 
 | 폰 | 방법 |
 |---|---|
