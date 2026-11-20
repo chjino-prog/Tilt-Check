@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.log
+.DS_Store
+
+# 회사 자료 (공개 저장소에 올리지 않음)
+작업지시서_*.md
+지주캡_PSA_입체도_라벨포함.png
