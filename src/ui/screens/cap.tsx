@@ -1,11 +1,12 @@
 // 지주캡 측정 : 정상값 → B 측정 → A 측정 → 결과(역산 · 잔차 · 판정)
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { analyzeCap, capNormal } from '../../calc/angle';
-import { capVerdict, fmt, fmtSigned, parseNum, verdictLevel } from '../../calc/judge';
+import { basisName, effectiveAngles, type Effective } from '../../calc/basis';
+import { capDirText, capVerdict, fmt, fmtSigned, parseNum, verdictLevel } from '../../calc/judge';
 import { deleteCap, getBlock, getCap, newId, saveRecord, type Block, type Cap } from '../../db/store';
 import { setSettings, useSettings } from '../../settings';
 import { useWakeLock } from '../../sensor/tilt';
-import { back } from '../router';
+import { back, go } from '../router';
 import { ConfirmSheet, Cta, Headline, MenuRow, NumInput, RefNote, RefWarningSheet, Sheet, TopBar, toast } from '../components/ui';
 import { ReadingCard, devOf, useMeasure } from '../components/reading';
 import { Gauge, PlanFigure } from '../components/gauge';
@@ -60,7 +61,21 @@ export function CapScreen(p: { blockId: string; capId: string }) {
       </div>
     );
 
-  const normal = capNormal(block.ta, block.fa, cap.delta, cap.dir);
+  const eff = effectiveAngles(block);
+  if (!eff)
+    return (
+      <div class="screen">
+        <TopBar backTo={'/block/' + block.id} />
+        <Headline eyebrow={`${block.ship} 호선 · ${block.block}`} title="T.A · F.A 가 아직 없어요" sub="블록에 도면값을 넣거나, 현물 기준 부재에서 재주세요" />
+        <Cta>
+          <button class="btn" onClick={() => go(`/block/${block.id}/ref`, true)}>
+            현물에서 재기
+          </button>
+        </Cta>
+      </div>
+    );
+  const normal = capNormal(eff.ta, eff.fa, cap.delta, cap.dir);
+  const dirText = capDirText(cap.delta, cap.dir);
   const aWeak = normal.dA < s.aSensMin;
   const title = `캡 ${cap.no}`;
   const stepBack = () => {
@@ -126,12 +141,13 @@ export function CapScreen(p: { blockId: string; capId: string }) {
           title={title}
           sub={
             <span class="num">
-              δ {fmt(cap.delta, 2)}° · {cap.dir === 1 ? '선수' : '선미'} 쪽으로 돌아간 캡
+              δ {fmt(cap.delta, 2)}°{dirText && ` · ${dirText} 쪽으로 돌아간 캡`}
             </span>
           }
         />
         <div class="section">
           <div class="card">
+            <BasisLine eff={eff} />
             <div class="stat-grid">
               <div class="stat">
                 <div class="k">정상 θB (상판)</div>
@@ -226,6 +242,7 @@ export function CapScreen(p: { blockId: string; capId: string }) {
       bar={bar}
       block={block}
       cap={cap}
+      eff={eff}
       measA={measA!}
       measB={measB!}
       onRetry={() => {
@@ -236,6 +253,18 @@ export function CapScreen(p: { blockId: string; capId: string }) {
     >
       {sheets}
     </ResultScreen>
+  );
+}
+
+/** 정상값 카드 위 한 줄 : 어느 기준으로 계산했는지 */
+function BasisLine(p: { eff: Effective }) {
+  return (
+    <div class="basis-line num">
+      <span>
+        {basisName(p.eff.basis)} 기준 · T.A {fmt(p.eff.ta, 2)}° · F.A {fmt(p.eff.fa, 2)}°
+      </span>
+      {p.eff.basis === 'ref' && <span class="badge blue">현물</span>}
+    </div>
   );
 }
 
@@ -314,14 +343,15 @@ function ResultScreen(p: {
   bar: preact.JSX.Element;
   block: Block;
   cap: Cap;
+  eff: Effective;
   measA: number;
   measB: number;
   onRetry: () => void;
   children: preact.ComponentChildren;
 }) {
   const s = useSettings();
-  const { block, cap } = p;
-  const r = useMemo(() => analyzeCap(block.ta, block.fa, cap.delta, cap.dir, p.measA, p.measB), [block, cap, p.measA, p.measB]);
+  const { block, cap, eff } = p;
+  const r = useMemo(() => analyzeCap(eff.ta, eff.fa, cap.delta, cap.dir, p.measA, p.measB), [eff, cap, p.measA, p.measB]);
   const verdict = capVerdict(r.rotErr, s);
   const lvl = verdictLevel(verdict);
   const residWarn = r.aResid != null && Math.abs(r.aResid) > s.aResidTol;
@@ -355,8 +385,9 @@ function ResultScreen(p: {
       blockId: block.id,
       ship: block.ship,
       block: block.block,
-      ta: block.ta,
-      fa: block.fa,
+      ta: eff.ta,
+      fa: eff.fa,
+      basis: eff.basis,
       mode: 'cap',
       capId: cap.id,
       capNo: cap.no,
@@ -422,6 +453,14 @@ function ResultScreen(p: {
 
       <div class="section mt16">
         <div class="card" style={{ padding: '10px 20px' }}>
+          <div class="kv-group">
+            <div class="kv">
+              <span class="k">계산 기준</span>
+              <span class="v num">
+                {basisName(eff.basis)} · T.A {fmt(eff.ta, 2)}° · F.A {fmt(eff.fa, 2)}°
+              </span>
+            </div>
+          </div>
           <div class="kv-group">
             <div class="kv">
               <span class="k">각도 B 실측</span>

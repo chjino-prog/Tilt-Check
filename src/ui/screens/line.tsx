@@ -1,8 +1,10 @@
 // 일반 부재 측정 (추가 기능) : FRAME 방향 / LONGL. 방향 / 임의각 ψ
 import { useEffect, useState } from 'preact/hooks';
 import { thetaLine, type Dir } from '../../calc/angle';
+import { effectiveAngles } from '../../calc/basis';
 import { fmt, lineVerdict, parseNum } from '../../calc/judge';
 import { getBlock, newId, saveRecord, type Block } from '../../db/store';
+import { go } from '../router';
 import { useSettings } from '../../settings';
 import { useWakeLock } from '../../sensor/tilt';
 import { Cta, Headline, NumInput, RefNote, RefWarningSheet, Seg, TopBar, toast } from '../components/ui';
@@ -40,9 +42,23 @@ export function LineScreen(p: { blockId: string }) {
       </div>
     );
 
+  const eff = effectiveAngles(block);
+  if (!eff)
+    return (
+      <div class="screen">
+        <TopBar title="다른 부재" backTo={'/block/' + block.id} />
+        <Headline eyebrow={`${block.ship} 호선 · ${block.block}`} title="T.A · F.A 가 아직 없어요" sub="블록에 도면값을 넣거나, 현물 기준 부재에서 재주세요" />
+        <Cta>
+          <button class="btn" onClick={() => go(`/block/${block.id}/ref`, true)}>
+            현물에서 재기
+          </button>
+        </Cta>
+      </div>
+    );
+
   const psi = parseNum(psiText);
-  const normal =
-    mode === 'frame' ? block.ta : mode === 'longl' ? block.fa : psi == null ? null : thetaLine(block.ta, block.fa, psi, dir);
+  const normal = mode === 'frame' ? eff.ta : mode === 'longl' ? eff.fa : psi == null ? null : thetaLine(eff.ta, eff.fa, psi, dir);
+  const refTag = eff.basis === 'ref' ? ' (현물)' : '';
   const label = mode === 'frame' ? 'FRAME 방향' : mode === 'longl' ? 'LONGL. 방향' : `임의각 ψ=${psi ?? ''}° ${dir === 1 ? '선수' : '선미'}`;
   const dev = devOf(m.value, normal, true);
   const canSave = m.fixed != null && normal != null && isFinite(normal);
@@ -56,8 +72,9 @@ export function LineScreen(p: { blockId: string }) {
       blockId: block.id,
       ship: block.ship,
       block: block.block,
-      ta: block.ta,
-      fa: block.fa,
+      ta: eff.ta,
+      fa: eff.fa,
+      basis: eff.basis,
       mode: 'line',
       lineLabel: label,
       normal: normal!,
@@ -103,7 +120,7 @@ export function LineScreen(p: { blockId: string }) {
         )}
         <div class="normal-pill num mt8">
           정상값 <b>{normal == null || !isFinite(normal) ? '—' : fmt(normal, 2) + '°'}</b>
-          <span style={{ color: 'var(--text-3)', fontSize: '13px' }}>{mode === 'frame' ? '= T.A' : mode === 'longl' ? '= F.A' : ''}</span>
+          <span style={{ color: 'var(--text-3)', fontSize: '13px' }}>{mode === 'frame' ? '= T.A' + refTag : mode === 'longl' ? '= F.A' + refTag : refTag.trim()}</span>
         </div>
       </div>
       <ReadingCard m={m} normal={normal} compareAbs={true} normalLabel="편차" />

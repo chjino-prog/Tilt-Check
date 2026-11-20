@@ -17,25 +17,28 @@ export function BlockSheet(p: { open: boolean; block?: Block | null; onClose: ()
     const b = p.block;
     setShip(b?.ship ?? '');
     setName(b?.block ?? '');
-    setTa(b ? String(b.ta) : '');
-    setFa(b ? String(b.fa) : '');
+    setTa(b?.ta != null ? String(b.ta) : '');
+    setFa(b?.fa != null ? String(b.fa) : '');
     setMemo(b?.memo ?? '');
   }, [p.open, p.block]);
 
   const taN = parseNum(ta);
   const faN = parseNum(fa);
-  const ready = ship.trim() !== '' && name.trim() !== '' && taN != null && faN != null;
+  // T.A · F.A 는 선택 — 모르면 둘 다 비우고 현물에서 잰다. 하나만 넣는 건 막는다.
+  const half = (taN == null) !== (faN == null);
+  const ready = ship.trim() !== '' && name.trim() !== '' && !half;
   const odd = taN != null && faN != null && !blockAnglesLookRight(taN, faN);
 
   const save = async () => {
     if (!ready) return;
     const now = Date.now();
     const b: Block = {
+      ...p.block, // 현물값 · 계산 기준은 그대로 둔다
       id: p.block?.id ?? newId(),
       ship: ship.trim(),
       block: name.trim().toUpperCase(),
-      ta: taN!,
-      fa: faN!,
+      ta: taN,
+      fa: faN,
       memo: memo.trim(),
       createdAt: p.block?.createdAt ?? now,
       updatedAt: now,
@@ -48,7 +51,7 @@ export function BlockSheet(p: { open: boolean; block?: Block | null; onClose: ()
   return (
     <Sheet open={p.open} onClose={p.onClose}>
       <h2>{p.block ? '블록 수정' : '블록 추가'}</h2>
-      <p class="sub">설계값을 넣으면 정상 각도를 계산해드려요</p>
+      <p class="sub">도면값을 모르면 비워 두고, 현물에서 재도 돼요</p>
       <div class="two-col">
         <Field label="호선">
           <TextInput value={ship} onInput={setShip} placeholder="예: 1234" autoFocus={!p.block} />
@@ -57,12 +60,13 @@ export function BlockSheet(p: { open: boolean; block?: Block | null; onClose: ()
           <TextInput value={name} onInput={setName} placeholder="예: A11P" />
         </Field>
       </div>
-      <Field label="T.A TRANSVERSE ANGLE">
-        <NumInput value={ta} onInput={setTa} placeholder="0.000" unit="°" />
+      <Field label="T.A TRANSVERSE ANGLE · 선택">
+        <NumInput value={ta} onInput={setTa} placeholder="모르면 비워두세요" unit="°" />
       </Field>
-      <Field label="F.A FRAME ANGLE">
-        <NumInput value={fa} onInput={setFa} placeholder="0.000" unit="°" />
+      <Field label="F.A FRAME ANGLE · 선택">
+        <NumInput value={fa} onInput={setFa} placeholder="모르면 비워두세요" unit="°" />
       </Field>
+      {half && <div class="warn-text">T.A · F.A 는 둘 다 넣거나 둘 다 비워주세요.</div>}
       {odd && <div class="warn-text">보통은 0 &lt; F.A ≤ T.A &lt; 90° 예요. T.A · F.A 정의가 맞는지 확인해주세요.</div>}
       <Field label="메모 (선택)">
         <TextInput value={memo} onInput={setMemo} placeholder="위치 · 특이사항" />

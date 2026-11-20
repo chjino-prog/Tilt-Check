@@ -31,6 +31,12 @@ export function verdictLevel(v: Verdict): Level {
   return 'none';
 }
 
+/** 캡 회전 방향 글 — δ 가 0 이면 돌아간 게 없으니 빈 글 */
+export function capDirText(delta: number | null | undefined, dir: 1 | -1 | undefined): string {
+  if (delta == null || Math.abs(delta) < 1e-9 || dir == null) return '';
+  return dir === 1 ? '선수' : '선미';
+}
+
 /** 숫자 표시 : 소수 자릿수, −0 방지 */
 export function fmt(v: number | null | undefined, d: number): string {
   if (v == null || !isFinite(v)) return '—';

@@ -13,10 +13,10 @@
 - 개발 : 집 PC, Node + Vite + Preact + TypeScript, 시험 Vitest.
 
 ## 구조
-- `src/calc/angle.ts` 순수 계산 · `judge.ts` 판정/표시 · `csv.ts` 내보내기
+- `src/calc/angle.ts` 순수 계산 · `basis.ts` 계산 기준(도면/현물 T.A · F.A) · `judge.ts` 판정/표시 · `csv.ts` 내보내기
 - `src/sensor/tilt.ts` 센서 → 각도 (EMA + 1초 평균, 안정 판정, |g| 검사, 영점 · 부호)
 - `src/db/store.ts` IndexedDB (blocks · caps · records) · `src/settings.ts` 설정(localStorage)
-- `src/ui/screens/*` 화면 · `src/ui/components/*` 공통 조각 · `src/styles.css` 디자인 토큰
+- `src/ui/screens/*` 화면 (`ref.tsx` = 현물 기준 재기) · `src/ui/components/*` 공통 조각 · `src/styles.css` 디자인 토큰
 - `public/sw.js` 오프라인 (빌드 때 파일 목록 자동 주입) · `tools/make_icons.py` 아이콘
 
 ## 필요할 때 읽을 문서

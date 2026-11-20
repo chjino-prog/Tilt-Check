@@ -1,6 +1,6 @@
 // 기록 : 블록별 목록 → 블록 기록 (경고 배너 · CSV 내보내기 · 상세/삭제)
 import { useEffect, useMemo, useState } from 'preact/hooks';
-import { fmt, fmtDate, fmtSigned, sameSignWarning, verdictLevel } from '../../calc/judge';
+import { capDirText, fmt, fmtDate, fmtSigned, sameSignWarning, verdictLevel } from '../../calc/judge';
 import { shareCsv } from '../../calc/csv';
 import { deleteRecord, getBlock, listBlocks, listRecords, listRecordsByBlock, type Block, type MeasureRecord } from '../../db/store';
 import { useSettings } from '../../settings';
@@ -226,7 +226,7 @@ function RecordSheet(p: { record: MeasureRecord | null; onClose: () => void; onD
       {r.mode === 'cap' ? (
         <>
           <div class="kv-group">
-            {kv('δ (도면)', `${fmt(r.delta, 2)}° ${r.dir === 1 ? '선수' : '선미'}`)}
+            {kv('δ (도면)', `${fmt(r.delta, 2)}° ${capDirText(r.delta, r.dir)}`.trim())}
             {kv('실제 δ', r.deltaReal == null ? '—' : fmt(r.deltaReal, 2) + '°')}
             {kv('회전오차', f(r.rotErr))}
           </div>
@@ -243,6 +243,9 @@ function RecordSheet(p: { record: MeasureRecord | null; onClose: () => void; onD
           {kv('편차', f(r.dev))}
         </div>
       )}
+      <div class="kv-group">
+        {kv('계산 기준', `${r.basis === 'ref' ? '현물' : '도면'} · T.A ${fmt(r.ta, 2)}° · F.A ${fmt(r.fa, 2)}°`)}
+      </div>
       {r.memo && (
         <div class="kv-group">
           <div class="kv">

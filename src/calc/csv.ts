@@ -1,6 +1,6 @@
 // CSV 내보내기 — 작업지시서 5-4 저장 항목 순서
 import type { MeasureRecord } from '../db/store';
-import { fmtDate } from './judge';
+import { capDirText, fmtDate } from './judge';
 
 export const CSV_HEADER = [
   '일시',
@@ -24,6 +24,7 @@ export const CSV_HEADER = [
   'A잔차',
   '판정',
   '메모',
+  '기준',
 ];
 
 const n = (v: number | null | undefined, d = 2) => (v == null || !isFinite(v) ? '' : v.toFixed(d));
@@ -47,7 +48,7 @@ export function recordsToCsv(records: MeasureRecord[]): string {
         n(r.ta, 3),
         n(r.fa, 3),
         cap ? n(r.delta) : '',
-        cap ? (r.dir === 1 ? '선수' : '선미') : '',
+        cap ? capDirText(r.delta, r.dir) : '',
         cap ? n(r.normalA) : n(r.normal),
         cap ? n(r.normalB) : '',
         cap ? n(r.measA) : n(r.meas),
@@ -59,6 +60,7 @@ export function recordsToCsv(records: MeasureRecord[]): string {
         cap ? n(r.aResid) : '',
         r.verdict,
         r.memo ?? '',
+        r.basis === 'ref' ? '현물' : '도면',
       ];
     });
   // 엑셀에서 한글이 깨지지 않도록 BOM + CRLF

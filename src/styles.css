@@ -1208,3 +1208,156 @@ textarea.input {
   color: var(--text-3);
   margin-left: 1px;
 }
+
+/* ── 현물 기준 (1.1) */
+.result-hero .mark.blue {
+  background: var(--blue);
+}
+.badge.blue {
+  background: var(--blue-weak);
+  color: var(--blue-weak-text);
+}
+/* 카드 안 세그먼트 : 카드 바탕과 구분되게 */
+.card .seg {
+  background: var(--bg);
+  margin-bottom: 16px;
+}
+.card .seg button.on {
+  background: var(--blue);
+  color: #fff;
+  box-shadow: none;
+}
+:root[data-theme='dark'] .card .seg {
+  background: var(--bg-sub);
+}
+:root[data-theme='dark'] .card .seg button.on {
+  background: var(--blue);
+}
+.angle-row .v {
+  text-align: right;
+}
+.angle-row .v .other {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-3);
+  margin-top: -2px;
+}
+.card-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 14px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--text-3);
+}
+.card-empty {
+  text-align: center;
+  padding: 24px 20px;
+}
+.card-empty .t {
+  font-size: 17px;
+  font-weight: 700;
+}
+.card-empty .s {
+  font-size: 14px;
+  color: var(--text-3);
+  margin: 4px 0 16px;
+  word-break: keep-all;
+}
+.basis-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-3);
+}
+.ref-cmp {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.ref-cmp .card {
+  padding: 16px;
+}
+.ref-cmp .k {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-3);
+}
+.ref-cmp .k b {
+  color: var(--text-2);
+}
+.ref-cmp .v {
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin-top: 2px;
+}
+.ref-cmp .v small {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text-3);
+}
+.ref-cmp .d {
+  font-size: 13px;
+  color: var(--text-3);
+  margin-top: 2px;
+}
+.ref-cmp .d em {
+  font-style: normal;
+  font-weight: 700;
+}
+/* 기준 부재 안내 시트 */
+.where {
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+.where:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+.where-h {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-3);
+  margin-bottom: 6px;
+}
+.where-h b {
+  color: var(--text);
+  margin-right: 4px;
+}
+.li {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 16px;
+  padding: 4px 0;
+  word-break: keep-all;
+}
+.li::before {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+}
+.li.ok::before {
+  content: '✓';
+  background: var(--green-weak);
+  color: var(--green);
+}
+.li.no::before {
+  content: '✕';
+  background: var(--red-weak);
+  color: var(--red);
+}

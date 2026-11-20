@@ -1,12 +1,17 @@
 // IndexedDB 저장소 — 블록 · 캡 · 측정기록. 모든 데이터는 이 폰 안에만 있다.
 import type { Dir } from '../calc/angle';
+import type { Basis } from '../calc/basis';
 
 export interface Block {
   id: string;
   ship: string; // 호선
   block: string; // 블록
-  ta: number; // T.A TRANSVERSE ANGLE
-  fa: number; // F.A FRAME ANGLE
+  ta: number | null; // T.A TRANSVERSE ANGLE (도면, 모르면 null)
+  fa: number | null; // F.A FRAME ANGLE (도면, 모르면 null)
+  refTa?: number; // 현물 T.A — DECK 상면 FRAME 라인을 폰으로 잰 값
+  refFa?: number; // 현물 F.A — CENTER LINE 과 평행한 LONGL. 라인을 폰으로 잰 값
+  refAt?: number; // 현물값을 잰 시각
+  basis?: Basis; // 계산 기준 (도면 / 현물)
   memo: string;
   createdAt: number;
   updatedAt: number;
@@ -29,8 +34,9 @@ export interface MeasureRecord {
   blockId: string;
   ship: string;
   block: string;
-  ta: number;
-  fa: number;
+  ta: number; // 계산에 쓴 T.A
+  fa: number; // 계산에 쓴 F.A
+  basis?: Basis; // 그때 쓴 기준 (예전 기록은 없음 = 도면)
   mode: 'cap' | 'line';
   // 지주캡
   capId?: string;
@@ -129,7 +135,9 @@ export async function duplicateBlock(id: string): Promise<Block | undefined> {
   const b = await getBlock(id);
   if (!b) return;
   const now = Date.now();
-  const copy: Block = { ...b, id: newId(), block: b.block + ' 복사', createdAt: now, updatedAt: now };
+  // 현물값은 그 블록 현물에서 잰 값이라 복제본에는 옮기지 않는다
+  const { refTa: _t, refFa: _f, refAt: _a, basis: _b, ...rest } = b;
+  const copy: Block = { ...rest, id: newId(), block: b.block + ' 복사', createdAt: now, updatedAt: now };
   await saveBlock(copy);
   for (const c of await listCaps(id)) await saveCap({ ...c, id: newId(), blockId: copy.id, createdAt: Date.now() });
   return copy;

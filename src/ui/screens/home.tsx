@@ -1,11 +1,19 @@
 // 홈 : 블록 목록 (호선별 묶음 + 검색)
 import { useEffect, useMemo, useState } from 'preact/hooks';
+import { effectiveAngles } from '../../calc/basis';
 import { fmt } from '../../calc/judge';
 import { listAllCaps, listBlocks, type Block } from '../../db/store';
 import { go } from '../router';
 import { BrandBar, Cta, Empty, Headline } from '../components/ui';
 import { ICap, IChevron, ISearch } from '../icons';
 import { BlockSheet } from './edit-sheets';
+
+/** 목록 한 줄 : 계산에 쓰는 T.A · F.A (현물이면 표시) */
+function angleText(b: Block): string {
+  const e = effectiveAngles(b);
+  if (!e) return 'T.A · F.A 미입력';
+  return `T.A ${fmt(e.ta, 2)}° · F.A ${fmt(e.fa, 2)}°${e.basis === 'ref' ? ' (현물)' : ''}`;
+}
 
 export function HomeScreen() {
   const [blocks, setBlocks] = useState<Block[] | null>(null);
@@ -70,7 +78,7 @@ export function HomeScreen() {
                     <div class="body">
                       <div class="t1">{b.block}</div>
                       <div class="t2 num">
-                        T.A {fmt(b.ta, 2)}° · F.A {fmt(b.fa, 2)}° · 캡 {capCount.get(b.id) ?? 0}개
+                        {angleText(b)} · 캡 {capCount.get(b.id) ?? 0}개
                       </div>
                     </div>
                     <div class="tail">
