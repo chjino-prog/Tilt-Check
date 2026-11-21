@@ -1,6 +1,7 @@
 // 작업지시서 3장 기준값 — 모두 ±0.01° 이내 (표의 반올림 자리 기준)
 import { describe, expect, it } from 'vitest';
 import { analyzeCap, dA, dB, inverseDelta, normDeg, thetaA, thetaB, thetaLine, type Dir } from './angle';
+import { analyzeCapDir, calcDir, capNormalDir, faHighSide, flipSuspect, highFromPhone, highOfB, signedA, signedB } from './sign';
 
 const near = (actual: number, expected: number, tol = 0.01) => {
   // 표 값(소수 2자리)과의 차이가 0.01° 이하
@@ -86,5 +87,61 @@ describe('normDeg', () => {
     expect(normDeg(190)).toBeCloseTo(-170);
     expect(normDeg(-190)).toBeCloseTo(170);
     expect(normDeg(180)).toBe(180);
+  });
+});
+
+// ── 방향 규칙 (sign.ts) — 도면 · 현장은 부호 대신 선수/선미
+
+describe('방향 규칙', () => {
+  it('거울 규칙 : 캡 방향과 F.A 방향이 같으면 s=+1', () => {
+    expect(calcDir(1, 1)).toBe(1);
+    expect(calcDir(-1, -1)).toBe(1);
+    expect(calcDir(1, -1)).toBe(-1);
+    expect(calcDir(-1, 1)).toBe(-1);
+  });
+
+  it('F.A 선미 · 캡 선미 = F.A 선수 · 캡 선수 와 같은 정상값', () => {
+    const a = capNormalDir(46.25, 8.84, 1, 7, 1);
+    const b = capNormalDir(46.25, 8.84, -1, 7, -1);
+    expect(b.thetaA).toBeCloseTo(a.thetaA, 9);
+    expect(b.thetaB).toBeCloseTo(a.thetaB, 9);
+  });
+
+  it('B 높은 쪽 : F.A 반대쪽이 높으면 +', () => {
+    expect(faHighSide(-1)).toBe(1); // F.A 선미 → TS 는 선수가 높음
+    expect(signedB(3.2, 1, -1)).toBeCloseTo(3.2);
+    expect(signedB(1.6, -1, -1)).toBeCloseTo(-1.6);
+    expect(signedB(-1.6, -1, -1)).toBeCloseTo(-1.6); // 숫자에 붙은 부호는 무시
+    expect(signedB(2, -1, 1)).toBeCloseTo(2); // F.A 선수 → 선미가 높으면 +
+    expect(highOfB(-1.6, -1)).toBe(-1);
+    expect(highOfB(0, -1)).toBeNull();
+  });
+
+  it('폰 머리 방향 → 높은 쪽', () => {
+    expect(highFromPhone(3.5, 1)).toBe(1);
+    expect(highFromPhone(-3.5, 1)).toBe(-1);
+    expect(highFromPhone(-3.5, -1)).toBe(1);
+  });
+
+  it('A 는 크기만', () => {
+    expect(signedA(-34.6, 34.59)).toBeCloseTo(34.6);
+  });
+
+  // 2026-11-21 현장값 (도면 T.A 34.41 · F.A 선미 3.23, 디지털 수평계)
+  it('F.A 선미 블록 : TS 는 선수 높음 = +F.A, PS 캡은 A 가 맞아떨어짐', () => {
+    const ts = analyzeCapDir(34.41, 3.23, -1, 0, 1, 34.55, signedB(3.6, 1, -1));
+    expect(ts.thetaB).toBeCloseTo(3.23, 2);
+    expect(ts.rotErr!).toBeCloseTo(0.65, 1);
+    const psa = analyzeCapDir(34.41, 3.23, -1, 7, -1, 34.6, signedB(1.6, -1, -1));
+    expect(psa.thetaA).toBeCloseTo(34.59, 2); // 예전 식(s=−1)은 33.64 로 1° 어긋남
+    expect(psa.thetaB).toBeCloseTo(-0.74, 2); // 선미 쪽이 0.74° 높은 게 정상
+    expect(psa.rotErr!).toBeCloseTo(1.51, 1);
+  });
+
+  it('TS 캡에서 높은 쪽을 반대로 고르면 의심 표시', () => {
+    const wrong = analyzeCapDir(34.41, 3.23, -1, 0, 1, 34.55, signedB(3.2, -1, -1));
+    const right = analyzeCapDir(34.41, 3.23, -1, 0, 1, 34.55, signedB(3.2, 1, -1));
+    expect(flipSuspect(wrong, right, 2)).not.toBeNull();
+    expect(flipSuspect(right, wrong, 2)).toBeNull();
   });
 });

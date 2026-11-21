@@ -1,8 +1,10 @@
 // 실측값 카드 : 센서 값(또는 직접 입력) + 안정 표시 + HOLD(화면 탭)
 import { useState } from 'preact/hooks';
 import { tilt, useTilt, vibrate, type TiltState } from '../../sensor/tilt';
-import { useSettings } from '../../settings';
+import { setSettings, useSettings } from '../../settings';
 import { devLevel, fmt, fmtSigned, parseNum } from '../../calc/judge';
+import type { Dir } from '../../calc/angle';
+import { dirName, highFromPhone } from '../../calc/sign';
 import { toast } from './ui';
 
 export interface Measure {
@@ -58,11 +60,15 @@ export function devOf(value: number | null, normal: number | null, compareAbs: b
   return compareAbs ? Math.abs(value) - Math.abs(normal) : value - normal;
 }
 
-export function ReadingCard(p: { m: Measure; normal: number | null; compareAbs: boolean; normalLabel?: string }) {
+/**
+ * unsigned : 숫자만 받는다 (± 버튼을 숨기고 '-' 를 지움). 부호는 높은 쪽 선택으로 붙인다.
+ * dev : 정상 대비 차이를 밖에서 계산해 넘길 때 (높은 쪽까지 반영한 값)
+ */
+export function ReadingCard(p: { m: Measure; normal: number | null; compareAbs: boolean; normalLabel?: string; unsigned?: boolean; dev?: number | null }) {
   const s = useSettings();
   const { m } = p;
   const st = m.sensor;
-  const dev = devOf(m.value, p.normal, p.compareAbs);
+  const dev = p.dev !== undefined ? p.dev : devOf(m.value, p.normal, p.compareAbs);
   const lvl = devLevel(dev, s);
   const noSensor = st.status === 'unsupported' || st.status === 'denied';
 
@@ -84,9 +90,11 @@ export function ReadingCard(p: { m: Measure; normal: number | null; compareAbs: 
             )}
           </div>
           <div class="row-gap mt8">
-            <button class="sign-btn" aria-label="부호 바꾸기" onClick={flip}>
-              ±
-            </button>
+            {!p.unsigned && (
+              <button class="sign-btn" aria-label="부호 바꾸기" onClick={flip}>
+                ±
+              </button>
+            )}
             <div class="input-wrap" style={{ flex: 1 }}>
               <input
                 class="input num"
@@ -95,7 +103,10 @@ export function ReadingCard(p: { m: Measure; normal: number | null; compareAbs: 
                 inputMode="decimal"
                 placeholder="0.0"
                 value={m.manualText}
-                onInput={(e) => m.setManualText((e.target as HTMLInputElement).value)}
+                onInput={(e) => {
+                  const t = (e.target as HTMLInputElement).value;
+                  m.setManualText(p.unsigned ? t.replace(/[-−]/g, '') : t);
+                }}
               />
               <span class="unit">°</span>
             </div>
@@ -177,6 +188,63 @@ function DevLine(p: { dev: number | null; lvl: string; decimals: number; normalL
     <div class="dev-line num">
       <span>{p.normalLabel ?? '정상 대비'}</span>
       <span class={'dv c-' + p.lvl}>{p.dev == null ? '—' : fmtSigned(p.dev, p.decimals) + '°'}</span>
+    </div>
+  );
+}
+
+// ── 높은 쪽 (B · LONGL. 라인) — 부호 대신 "어느 쪽이 높은지"만 받는다
+export interface HighSide {
+  high: Dir | null; // 결과 : 높은 쪽
+  flat: boolean; // 거의 수평 (높은 쪽 필요 없음)
+  ready: boolean; // 다음 단계로 갈 수 있는지
+  picked: Dir | null;
+  setPicked: (d: Dir) => void;
+}
+
+export function useHighSide(m: Measure, initial?: Dir | null): HighSide {
+  const s = useSettings();
+  const [picked, setPicked] = useState<Dir | null>(initial ?? null);
+  const v = m.value;
+  const flat = v != null && Math.abs(v) < 0.005;
+  const high = v == null || flat ? null : m.manual ? picked : highFromPhone(v, s.headDir);
+  return { high, flat, ready: v != null && (flat || high != null), picked, setPicked };
+}
+
+function DirSeg(p: { value: Dir | null; onChange: (d: Dir) => void }) {
+  return (
+    <div class="seg dir-seg">
+      {([1, -1] as Dir[]).map((d) => (
+        <button class={p.value === d ? 'on' : ''} onClick={() => p.onChange(d)}>
+          {dirName(d)} 쪽
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** 센서 : 폰 머리가 향한 쪽을 고르면 높은 쪽은 앱이 정함 / 직접 입력 : 높은 쪽을 직접 고름 */
+export function HighPicker(p: { m: Measure; h: HighSide }) {
+  const s = useSettings();
+  const { m, h } = p;
+  if (!m.manual && m.sensor.status !== 'running') return null; // 센서 켜기 전에는 숨김
+  if (m.manual) {
+    return (
+      <div class="high-pick">
+        <div class="high-k">
+          <span>어느 쪽이 높아요?</span>
+          {h.flat && <em>수평이라 안 골라도 돼요</em>}
+        </div>
+        <DirSeg value={h.picked} onChange={h.setPicked} />
+      </div>
+    );
+  }
+  return (
+    <div class="high-pick">
+      <div class="high-k">
+        <span>폰 머리(카메라 쪽)가 향한 쪽</span>
+        <em>{h.high ? <><b>{dirName(h.high)} 쪽</b>이 높아요</> : h.flat ? '거의 수평이에요' : ''}</em>
+      </div>
+      <DirSeg value={s.headDir} onChange={(d) => setSettings({ headDir: d })} />
     </div>
   );
 }

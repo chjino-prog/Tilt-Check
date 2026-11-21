@@ -10,6 +10,7 @@ export function BlockSheet(p: { open: boolean; block?: Block | null; onClose: ()
   const [name, setName] = useState('');
   const [ta, setTa] = useState('');
   const [fa, setFa] = useState('');
+  const [faDir, setFaDir] = useState<Dir | null>(null);
   const [memo, setMemo] = useState('');
 
   useEffect(() => {
@@ -18,15 +19,18 @@ export function BlockSheet(p: { open: boolean; block?: Block | null; onClose: ()
     setShip(b?.ship ?? '');
     setName(b?.block ?? '');
     setTa(b?.ta != null ? String(b.ta) : '');
-    setFa(b?.fa != null ? String(b.fa) : '');
+    setFa(b?.fa != null ? String(Math.abs(b.fa)) : '');
+    setFaDir(b?.faDir ?? null);
     setMemo(b?.memo ?? '');
   }, [p.open, p.block]);
 
   const taN = parseNum(ta);
-  const faN = parseNum(fa);
+  const faRaw = parseNum(fa);
+  const faN = faRaw == null ? null : Math.abs(faRaw); // 도면은 크기 + 방향, 부호는 받지 않는다
   // T.A · F.A 는 선택 — 모르면 둘 다 비우고 현물에서 잰다. 하나만 넣는 건 막는다.
   const half = (taN == null) !== (faN == null);
-  const ready = ship.trim() !== '' && name.trim() !== '' && !half;
+  const needDir = faN != null && faN > 0;
+  const ready = ship.trim() !== '' && name.trim() !== '' && !half && (!needDir || faDir != null);
   const odd = taN != null && faN != null && !blockAnglesLookRight(taN, faN);
 
   const save = async () => {
@@ -39,6 +43,7 @@ export function BlockSheet(p: { open: boolean; block?: Block | null; onClose: ()
       block: name.trim().toUpperCase(),
       ta: taN,
       fa: faN,
+      faDir: faDir ?? undefined,
       memo: memo.trim(),
       createdAt: p.block?.createdAt ?? now,
       updatedAt: now,
@@ -64,9 +69,22 @@ export function BlockSheet(p: { open: boolean; block?: Block | null; onClose: ()
         <NumInput value={ta} onInput={setTa} placeholder="모르면 비워두세요" unit="°" />
       </Field>
       <Field label="F.A FRAME ANGLE · 선택">
-        <NumInput value={fa} onInput={setFa} placeholder="모르면 비워두세요" unit="°" />
+        <NumInput value={fa} onInput={(v) => setFa(v.replace(/[-−]/g, ''))} placeholder="모르면 비워두세요" unit="°" />
       </Field>
+      {faN != null && (
+        <Field label="F.A 방향" hint="도면에 적힌 그대로 (예: F.A 선미로 3.2°)">
+          <Seg<Dir>
+            value={faDir}
+            onChange={setFaDir}
+            options={[
+              { v: 1, label: '선수' },
+              { v: -1, label: '선미' },
+            ]}
+          />
+        </Field>
+      )}
       {half && <div class="warn-text">T.A · F.A 는 둘 다 넣거나 둘 다 비워주세요.</div>}
+      {needDir && faDir == null && <div class="warn-text">F.A 방향(선수 / 선미)을 골라주세요.</div>}
       {odd && <div class="warn-text">보통은 0 &lt; F.A ≤ T.A &lt; 90° 예요. T.A · F.A 정의가 맞는지 확인해주세요.</div>}
       <Field label="메모 (선택)">
         <TextInput value={memo} onInput={setMemo} placeholder="위치 · 특이사항" />

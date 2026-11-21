@@ -33,6 +33,7 @@ export const IWarnFill = () => (
   </svg>
 );
 export const IInfo = () => <S d={['M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z', 'M12 11v5', 'M12 7.8v.1']} />;
+export const IDownload = () => <S d={['M12 3v12', 'M7.5 10.5L12 15l4.5-4.5', 'M5 19h14']} />;
 export const IShare = () => <S d={['M12 3v12', 'M7.5 7.5L12 3l4.5 4.5', 'M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6']} />;
 export const IEdit = () => <S d={['M4 20h4L19 9l-4-4L4 16z', 'M13.5 6.5l4 4']} />;
 export const ICopy = () => <S d={['M9 9h10v10H9z', 'M5 15V5h10']} />;

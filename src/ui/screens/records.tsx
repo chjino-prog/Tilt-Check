@@ -1,19 +1,51 @@
 // 기록 : 블록별 목록 → 블록 기록 (경고 배너 · CSV 내보내기 · 상세/삭제)
 import { useEffect, useMemo, useState } from 'preact/hooks';
+import { bText, dirName } from '../../calc/sign';
 import { capDirText, fmt, fmtDate, fmtSigned, sameSignWarning, verdictLevel } from '../../calc/judge';
-import { shareCsv } from '../../calc/csv';
+import { canShareFile, downloadCsv, shareCsv } from '../../calc/csv';
 import { deleteRecord, getBlock, listBlocks, listRecords, listRecordsByBlock, type Block, type MeasureRecord } from '../../db/store';
 import { useSettings } from '../../settings';
 import { go } from '../router';
-import { BrandBar, ConfirmSheet, Empty, Headline, Seg, Sheet, TopBar, toast } from '../components/ui';
-import { IChevron, IShare, ITabRecord, IWarn } from '../icons';
+import { BrandBar, ConfirmSheet, Empty, Headline, MenuRow, Seg, Sheet, TopBar, toast } from '../components/ui';
+import { IChevron, IDownload, IShare, ITabRecord, IWarn } from '../icons';
 import { SameSignBanner } from './block';
 
 const today = () => new Date().toISOString().slice(0, 10).replace(/-/g, '');
 
+/** CSV 내보내기 : 다운로드 폴더에 저장(회사 PC 로 옮기기 쉬움) / 다른 앱으로 보내기 */
+function ExportSheet(p: { open: boolean; records: MeasureRecord[]; name: string; onClose: () => void }) {
+  return (
+    <Sheet open={p.open} onClose={p.onClose}>
+      <h2>CSV 내보내기</h2>
+      <p class="sub">{p.records.length}건 · {p.name}</p>
+      <MenuRow
+        icon={IDownload}
+        label="다운로드 폴더에 저장"
+        onClick={() => {
+          downloadCsv(p.records, p.name);
+          p.onClose();
+          toast('다운로드 폴더에 저장했어요');
+        }}
+      />
+      {canShareFile() && (
+        <MenuRow
+          icon={IShare}
+          label="다른 앱으로 보내기"
+          onClick={() => {
+            p.onClose();
+            shareCsv(p.records, p.name);
+          }}
+        />
+      )}
+      <p class="note">다운로드 폴더는 폰 '내 파일 › 다운로드' 에 있어요. USB 로 PC 에 연결해 옮기면 돼요</p>
+    </Sheet>
+  );
+}
+
 export function RecordsScreen() {
   const [records, setRecords] = useState<MeasureRecord[] | null>(null);
   const [blocks, setBlocks] = useState<Block[]>([]);
+  const [exporting, setExporting] = useState(false);
   useEffect(() => {
     Promise.all([listRecords(), listBlocks()]).then(([r, b]) => {
       setRecords(r);
@@ -44,13 +76,14 @@ export function RecordsScreen() {
       <BrandBar
         right={
           !empty && records ? (
-            <button class="icon-btn" aria-label="전체 CSV 내보내기" onClick={() => shareCsv(records, `TILTCHECK_전체_${today()}.csv`)}>
+            <button class="icon-btn" aria-label="전체 CSV 내보내기" onClick={() => setExporting(true)}>
               <IShare />
             </button>
           ) : undefined
         }
       />
       <Headline title="기록" sub={records && !empty ? `${records.length}건 · 블록별로 모아 봐요` : undefined} />
+      {records && <ExportSheet open={exporting} records={records} name={`TILTCHECK_전체_${today()}.csv`} onClose={() => setExporting(false)} />}
       {empty ? (
         <Empty icon={ITabRecord} title="아직 기록이 없어요" sub="측정 결과에서 ‘기록 저장’을 누르면 여기에 모여요" />
       ) : (
@@ -93,7 +126,7 @@ type Filter = 'all' | 'cap' | 'line';
 
 function summary(r: MeasureRecord, d: number): string {
   if (r.mode === 'cap') {
-    if (r.rotErr == null) return `B ${fmtSigned(r.measB, 2)}° · 역산 불가`;
+    if (r.rotErr == null) return `B ${bText(r.measB, r.faDir ?? 1)} · 역산 불가`;
     return `회전오차 ${fmtSigned(r.rotErr, 2)}° · A잔차 ${fmtSigned(r.aResid, 2)}°`;
   }
   return `실측 ${fmt(Math.abs(r.meas ?? NaN), d)}° · 편차 ${fmtSigned(r.dev, d)}°`;
@@ -106,6 +139,7 @@ export function BlockRecordsScreen(p: { blockId: string }) {
   const [filter, setFilter] = useState<Filter>('all');
   const [open, setOpen] = useState<MeasureRecord | null>(null);
   const [confirmDel, setConfirmDel] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const load = async () => {
     const [b, rs] = await Promise.all([getBlock(p.blockId), listRecordsByBlock(p.blockId)]);
@@ -132,7 +166,7 @@ export function BlockRecordsScreen(p: { blockId: string }) {
         backTo="/records"
         right={
           records && records.length > 0 ? (
-            <button class="icon-btn" aria-label="CSV 내보내기" onClick={() => shareCsv(records, `TILTCHECK_${ship}_${name}_${today()}.csv`)}>
+            <button class="icon-btn" aria-label="CSV 내보내기" onClick={() => setExporting(true)}>
               <IShare />
             </button>
           ) : (
@@ -140,6 +174,7 @@ export function BlockRecordsScreen(p: { blockId: string }) {
           )
         }
       />
+      {records && <ExportSheet open={exporting} records={records} name={`TILTCHECK_${ship}_${name}_${today()}.csv`} onClose={() => setExporting(false)} />}
       {records && <SameSignBanner records={records} />}
       {records && records.some((r) => r.mode === 'line') && records.some((r) => r.mode === 'cap') && (
         <div class="section" style={{ marginBottom: '12px' }}>
@@ -231,8 +266,10 @@ function RecordSheet(p: { record: MeasureRecord | null; onClose: () => void; onD
             {kv('회전오차', f(r.rotErr))}
           </div>
           <div class="kv-group">
-            {kv('B 실측 / 정상', `${f(r.measB)} / ${f(r.normalB)}`)}
-            {kv('A 실측 / 정상', `${f(r.measA)} / ${f(r.normalA)}`)}
+            {kv('F.A', `${dirName(r.faDir ?? 1)} ${fmt(r.fa, 2)}°`)}
+            {kv('B 실측', bText(r.measB, r.faDir ?? 1))}
+            {kv('B 정상', bText(r.normalB, r.faDir ?? 1))}
+            {kv('A 실측 / 정상', `${fmt(r.measA, 2)}° / ${fmt(r.normalA, 2)}°`)}
             {kv('A 잔차', f(r.aResid))}
           </div>
         </>

@@ -136,7 +136,7 @@ export function ToastHost() {
   ) : null;
 }
 
-export function Seg<T extends string | number>(p: { value: T; options: { v: T; label: string }[]; onChange: (v: T) => void }) {
+export function Seg<T extends string | number>(p: { value: T | null; options: { v: T; label: string }[]; onChange: (v: T) => void }) {
   return (
     <div class="seg" role="tablist">
       {p.options.map((o) => (

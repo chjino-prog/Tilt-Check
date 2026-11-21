@@ -1,30 +1,105 @@
-// 지주캡 측정 : 정상값 → B 측정 → A 측정 → 결과(역산 · 잔차 · 판정)
+// 지주캡 측정 : 측정 순서(잰 값은 단계마다 저장) → B 측정 → A 측정 → 결과(역산 · 잔차 · 판정)
+// 부호는 쓰지 않는다 — B 는 "숫자 + 높은 쪽(선수/선미)", A 는 숫자만. 부호는 calc/sign.ts 가 붙인다.
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { analyzeCap, capNormal } from '../../calc/angle';
+import type { Dir } from '../../calc/angle';
 import { basisName, effectiveAngles, type Effective } from '../../calc/basis';
 import { capDirText, capVerdict, fmt, fmtSigned, parseNum, verdictLevel } from '../../calc/judge';
-import { deleteCap, getBlock, getCap, newId, saveRecord, type Block, type Cap } from '../../db/store';
+import { analyzeCapDir, bText, capNormalDir, dirName, faHighSide, flipSuspect, highOfB, signedA, signedB } from '../../calc/sign';
+import { clearDraft, loadDraft, saveDraft, type Draft, type Reading } from '../../db/draft';
+import { deleteCap, getBlock, getCap, newId, saveBlock, saveRecord, type Block, type Cap } from '../../db/store';
 import { setSettings, useSettings } from '../../settings';
 import { useWakeLock } from '../../sensor/tilt';
 import { back, go } from '../router';
-import { ConfirmSheet, Cta, Headline, MenuRow, NumInput, RefNote, RefWarningSheet, Sheet, TopBar, toast } from '../components/ui';
-import { ReadingCard, devOf, useMeasure } from '../components/reading';
+import { ConfirmSheet, Cta, Headline, MenuRow, NumInput, RefNote, RefWarningSheet, Seg, Sheet, TopBar, toast } from '../components/ui';
+import { HighPicker, ReadingCard, useHighSide, useMeasure } from '../components/reading';
 import { Gauge, PlanFigure } from '../components/gauge';
-import { IBack, ICamera, ICheck, IEdit, IImage, IInfo, IMinus, IMore, ITrash, IWarn, IX } from '../icons';
+import { IBack, ICamera, ICheck, IChevron, IEdit, IImage, IInfo, IMinus, IMore, IRuler, ITrash, IWarn, IX } from '../icons';
 import { CapSheet } from './edit-sheets';
 import { makePhoto } from './photo';
 
 type Stage = 'ready' | 'B' | 'A' | 'result';
 
+/** 캡 종류별 부재 번호 (지주캡 측정 방향 그림 기준) */
+export function capLines(no: string) {
+  const n = no.trim().toUpperCase();
+  if (n.startsWith('TS')) return { b: '④ 주판 · ②·③ 과 평행', a: '④ 주판 · ① 과 평행' };
+  if (n.startsWith('PSA')) return { b: '③ 주판 · ④·⑤ 와 평행', a: '③ 주판 · ①·② 와 평행' };
+  return { b: '주판 · WEB 직각 (브라켓과 평행)', a: '주판 · WEB 과 평행' };
+}
+
+/** 높은 쪽 글자만 : "선미 높음" */
+function sideText(b: number, faDir: Dir): string {
+  const h = highOfB(b, faDir);
+  return h ? dirName(h) + ' 높음' : '수평';
+}
+
+const hhmm = (t: number) => {
+  const d = new Date(t);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+};
+
 export function GuideSheet(p: { open: boolean; onClose: () => void }) {
   return (
     <Sheet open={p.open} onClose={p.onClose}>
-      <h2>측정 위치</h2>
-      <p class="sub">각도기 B는 ③ 상판, 각도기 A는 ① WEB 상단이에요</p>
-      <img class="guide-img" src={`${import.meta.env.BASE_URL}cap-guide.png`} alt="지주캡 측정 위치 그림 — ① WEB, ③ 상판, 각도기 A · B 위치" />
+      <h2>측정 방향</h2>
+      <p class="sub">각도기는 주판 위에, 기준 부재 밑변과 평행하게 대요</p>
+      <a href={`${import.meta.env.BASE_URL}cap-guide.webp`} target="_blank" rel="noopener">
+        <img
+          class="guide-img"
+          src={`${import.meta.env.BASE_URL}cap-guide.webp`}
+          alt="지주캡 측정 방향 그림 — TS 는 ④ 주판, PSA 는 ③ 주판. T/A(각도 A) 는 WEB 과 평행, F/A(각도 B) 는 브라켓과 평행"
+        />
+      </a>
+      <div class="note center">그림을 누르면 크게 봐요</div>
+      <div class="where mt16">
+        <div class="li ok">
+          <span>
+            <b>각도 B (F/A)</b> 숫자와 함께 높은 쪽(선수/선미)을 골라요
+          </span>
+        </div>
+        <div class="li ok">
+          <span>
+            <b>각도 A (T/A)</b> 숫자만 넣어요. 어느 쪽으로 대도 돼요
+          </span>
+        </div>
+      </div>
       <div class="actions mt16">
         <button class="btn" onClick={p.onClose}>
           확인
+        </button>
+      </div>
+    </Sheet>
+  );
+}
+
+/** 예전 블록 : F.A 방향을 아직 안 정했으면 여기서 바로 정한다 */
+function FaDirSheet(p: { open: boolean; block: Block; onClose: () => void; onSaved: (b: Block) => void }) {
+  const [d, setD] = useState<Dir>(p.block.faDir ?? 1);
+  return (
+    <Sheet open={p.open} onClose={p.onClose}>
+      <h2>F.A 는 어느 쪽이에요?</h2>
+      <p class="sub">도면에 적힌 방향 그대로 골라요 (예: F.A 선미로 3.2°)</p>
+      <Seg<Dir>
+        value={d}
+        onChange={setD}
+        options={[
+          { v: 1, label: '선수' },
+          { v: -1, label: '선미' },
+        ]}
+      />
+      <div class="actions mt16">
+        <button class="btn grey" onClick={p.onClose}>
+          닫기
+        </button>
+        <button
+          class="btn"
+          onClick={async () => {
+            const nb = { ...p.block, faDir: d, updatedAt: Date.now() };
+            await saveBlock(nb);
+            p.onSaved(nb);
+          }}
+        >
+          저장
         </button>
       </div>
     </Sheet>
@@ -36,11 +111,11 @@ export function CapScreen(p: { blockId: string; capId: string }) {
   const [block, setBlock] = useState<Block | null | undefined>(undefined);
   const [cap, setCap] = useState<Cap | null | undefined>(undefined);
   const [stage, setStage] = useState<Stage>('ready');
-  const [measB, setMeasB] = useState<number | null>(null);
-  const [measA, setMeasA] = useState<number | null>(null);
+  const [draft, setDraftState] = useState<Draft>(() => loadDraft('cap', p.capId));
   const [menu, setMenu] = useState(false);
   const [guide, setGuide] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [faSheet, setFaSheet] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
 
   const load = async () => {
@@ -50,7 +125,14 @@ export function CapScreen(p: { blockId: string; capId: string }) {
   };
   useEffect(() => {
     load();
+    setDraftState(loadDraft('cap', p.capId));
   }, [p.blockId, p.capId]);
+
+  /** 잰 값은 단계마다 바로 저장 — 화면을 나가도 남는다 */
+  const putDraft = (d: Draft) => {
+    setDraftState(d);
+    saveDraft('cap', p.capId, d);
+  };
 
   if (block === undefined || cap === undefined) return <div class="screen" />;
   if (!block || !cap)
@@ -74,18 +156,23 @@ export function CapScreen(p: { blockId: string; capId: string }) {
         </Cta>
       </div>
     );
-  const normal = capNormal(eff.ta, eff.fa, cap.delta, cap.dir);
+  const normal = capNormalDir(eff.ta, eff.fa, eff.faDir, cap.delta, cap.dir);
   const dirText = capDirText(cap.delta, cap.dir);
   const aWeak = normal.dA < s.aSensMin;
+  const lines = capLines(cap.no);
   const title = `캡 ${cap.no}`;
+  const rB = draft.first;
+  const rA = draft.second;
+  const faUnset = !eff.faDirSet && eff.fa > 0.05;
+
+  /** 한 방향을 저장하면 아직 안 잰 방향으로, 둘 다 있으면 결과로 */
+  const nextAfter = (d: Draft): Stage => (!d.first ? 'B' : !d.second ? 'A' : 'result');
+
   const stepBack = () => {
-    if (stage === 'B') setStage('ready');
-    else if (stage === 'A') setStage('B');
-    else if (stage === 'result') setStage('A');
-    else back('/block/' + block.id);
+    if (stage === 'ready') back('/block/' + block.id);
+    else setStage('ready'); // 잰 값은 그대로 두고 측정 순서 화면으로
   };
 
-  // 뒤로 버튼은 화면 밖이 아니라 이전 단계로
   const bar = (
     <header class="topbar">
       <button class="icon-btn" aria-label="뒤로" onClick={stepBack}>
@@ -101,11 +188,33 @@ export function CapScreen(p: { blockId: string; capId: string }) {
   const sheets = (
     <>
       <Sheet open={menu} onClose={() => setMenu(false)}>
-        <MenuRow icon={IImage} label="측정 위치 그림" onClick={() => (setMenu(false), setGuide(true))} />
+        <MenuRow icon={IImage} label="측정 방향 그림" onClick={() => (setMenu(false), setGuide(true))} />
+        {(rA || rB) && (
+          <MenuRow
+            icon={IRuler}
+            label="잰 값 지우고 처음부터"
+            onClick={() => {
+              setMenu(false);
+              clearDraft('cap', cap.id);
+              setDraftState({});
+              setStage('ready');
+            }}
+          />
+        )}
         <MenuRow icon={IEdit} label="지주캡 수정" onClick={() => (setMenu(false), setEditing(true))} />
         <MenuRow icon={ITrash} label="지주캡 삭제" danger onClick={() => (setMenu(false), setConfirmDel(true))} />
       </Sheet>
       <GuideSheet open={guide} onClose={() => setGuide(false)} />
+      <FaDirSheet
+        open={faSheet}
+        block={block}
+        onClose={() => setFaSheet(false)}
+        onSaved={(b) => {
+          setFaSheet(false);
+          setBlock(b);
+          toast(`F.A ${dirName(b.faDir!)} 쪽으로 계산해요`);
+        }}
+      />
       <CapSheet
         open={editing}
         blockId={block.id}
@@ -125,6 +234,7 @@ export function CapScreen(p: { blockId: string; capId: string }) {
         onClose={() => setConfirmDel(false)}
         onOk={async () => {
           await deleteCap(cap.id);
+          clearDraft('cap', cap.id);
           toast('지주캡을 지웠어요');
           back('/block/' + block.id);
         }}
@@ -133,6 +243,29 @@ export function CapScreen(p: { blockId: string; capId: string }) {
   );
 
   if (stage === 'ready') {
+    const step = (key: 'B' | 'A', name: string, where: string, r: Reading | undefined, side?: string) => (
+      <button class="row" onClick={() => setStage(key)}>
+        <div class={'lead ' + (r ? 'done' : 'blue')}>{r ? <ICheck /> : key}</div>
+        <div class="body">
+          <div class="t1">{name}</div>
+          <div class="t2">{where}</div>
+        </div>
+        {r ? (
+          <div class="saved num">
+            <b>{fmt(r.v, 2)}°</b>
+            <span>
+              {side ? side + ' · ' : ''}
+              {hhmm(r.at)}
+            </span>
+          </div>
+        ) : (
+          <span class="chev">
+            <IChevron />
+          </span>
+        )}
+      </button>
+    );
+    const next = nextAfter(draft);
     return (
       <div class="screen">
         {bar}
@@ -145,21 +278,36 @@ export function CapScreen(p: { blockId: string; capId: string }) {
             </span>
           }
         />
+        {faUnset && (
+          <div class="banner">
+            <IWarn />
+            <div>
+              <b>F.A 방향(선수/선미)을 아직 안 정했어요</b>
+              <span class="muted">지금은 선수로 계산해요. 방향이 틀리면 회전오차가 크게 틀어져요</span>
+              <div>
+                <button class="text-btn mt8" onClick={() => setFaSheet(true)}>
+                  F.A 방향 정하기
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         <div class="section">
           <div class="card">
             <BasisLine eff={eff} />
             <div class="stat-grid">
               <div class="stat">
-                <div class="k">정상 θB (상판)</div>
+                <div class="k">정상 B (F/A)</div>
                 <div class="v num">
-                  {fmt(normal.thetaB, 2)}
+                  {fmt(Math.abs(normal.thetaB), 2)}
                   <small>°</small>
                 </div>
+                <div class="k">{sideText(normal.thetaB, eff.faDir)}</div>
               </div>
               <div class={'stat' + (aWeak ? ' muted' : '')}>
-                <div class="k">정상 θA (WEB)</div>
+                <div class="k">정상 A (T/A)</div>
                 <div class="v num">
-                  {fmt(normal.thetaA, 2)}
+                  {fmt(Math.abs(normal.thetaA), 2)}
                   <small>°</small>
                 </div>
               </div>
@@ -176,30 +324,18 @@ export function CapScreen(p: { blockId: string; capId: string }) {
           </div>
         </div>
         <div class="section-title">
-          <span>이렇게 재요</span>
+          <span>{rA || rB ? '잰 값은 저장돼 있어요' : '이렇게 재요'}</span>
           <button class="text-btn" onClick={() => setGuide(true)}>
             그림 보기
           </button>
         </div>
         <div class="list">
-          <div class="row compact">
-            <div class="lead blue">1</div>
-            <div class="body">
-              <div class="t1">③ 상판 — 각도 B</div>
-              <div class="t2">WEB 직각(LONGL.) 방향으로 대요</div>
-            </div>
-          </div>
-          <div class="row compact">
-            <div class="lead blue">2</div>
-            <div class="body">
-              <div class="t1">① WEB 상단 — 각도 A</div>
-              <div class="t2">WEB 방향으로 대요</div>
-            </div>
-          </div>
+          {step('B', 'F/A 방향 · 각도 B', lines.b, rB, rB ? (rB.high ? dirName(rB.high) + ' 높음' : '수평') : undefined)}
+          {step('A', 'T/A 방향 · 각도 A', lines.a, rA)}
         </div>
         <Cta>
-          <button class="btn" onClick={() => setStage('B')}>
-            측정 시작
+          <button class="btn" onClick={() => setStage(next)}>
+            {next === 'B' ? (rA ? 'B 재기' : '측정 시작') : next === 'A' ? 'A 재기' : '결과 보기'}
           </button>
         </Cta>
         {sheets}
@@ -213,28 +349,29 @@ export function CapScreen(p: { blockId: string; capId: string }) {
       <StepScreen
         key={stage}
         bar={bar}
-        step={isB ? 1 : 2}
-        eyebrow={isB ? '1/2 · 각도 B' : '2/2 · 각도 A'}
-        title={isB ? '③ 상판에 폰을 대주세요' : '① WEB 상단에 폰을 대주세요'}
-        sub={isB ? 'WEB 직각(LONGL.) 방향 · 폰 윗단을 F.A 높은 쪽으로' : 'WEB 방향 · 폰 윗단을 T.A 높은 쪽으로'}
-        normalLabel={isB ? '정상 θB' : '정상 θA'}
+        isB={isB}
+        done={{ B: !!rB, A: !!rA }}
+        title={isB ? '주판에 F/A 방향으로 대주세요' : '주판에 T/A 방향으로 대주세요'}
+        sub={isB ? lines.b : lines.a + ' · 어느 쪽으로 대도 돼요'}
         normal={isB ? normal.thetaB : normal.thetaA}
-        initial={isB ? measB : measA}
+        faDir={eff.faDir}
         weak={!isB && aWeak}
         onGuide={() => setGuide(true)}
-        onDone={(v) => {
-          if (isB) {
-            setMeasB(v);
-            setStage('A');
-          } else {
-            setMeasA(v);
-            setStage('result');
-          }
+        onDone={(r) => {
+          const d = isB ? { ...draft, first: r } : { ...draft, second: r };
+          putDraft(d);
+          setStage(nextAfter(d));
         }}
       >
         {sheets}
       </StepScreen>
     );
+  }
+
+  if (!rA || !rB) {
+    // 결과에 필요한 값이 없으면 순서 화면으로
+    setStage('ready');
+    return <div class="screen" />;
   }
 
   return (
@@ -243,13 +380,11 @@ export function CapScreen(p: { blockId: string; capId: string }) {
       block={block}
       cap={cap}
       eff={eff}
-      measA={measA!}
-      measB={measB!}
-      onRetry={() => {
-        setMeasA(null);
-        setMeasB(null);
-        setStage('B');
-      }}
+      rA={rA}
+      rB={rB}
+      onFlipB={() => putDraft({ ...draft, first: { ...rB, high: rB.high ? (-rB.high as Dir) : rB.high } })}
+      onRetry={() => setStage('ready')}
+      onSaved={() => clearDraft('cap', cap.id)}
     >
       {sheets}
     </ResultScreen>
@@ -261,7 +396,7 @@ function BasisLine(p: { eff: Effective }) {
   return (
     <div class="basis-line num">
       <span>
-        {basisName(p.eff.basis)} 기준 · T.A {fmt(p.eff.ta, 2)}° · F.A {fmt(p.eff.fa, 2)}°
+        {basisName(p.eff.basis)} 기준 · T.A {fmt(p.eff.ta, 2)}° · F.A {dirName(p.eff.faDir)} {fmt(p.eff.fa, 2)}°
       </span>
       {p.eff.basis === 'ref' && <span class="badge blue">현물</span>}
     </div>
@@ -270,33 +405,38 @@ function BasisLine(p: { eff: Effective }) {
 
 function StepScreen(p: {
   bar: preact.JSX.Element;
-  step: number;
-  eyebrow: string;
+  isB: boolean;
+  done: { B: boolean; A: boolean };
   title: string;
   sub: string;
-  normalLabel: string;
   normal: number;
-  initial: number | null;
+  faDir: Dir;
   weak: boolean;
   onGuide: () => void;
-  onDone: (v: number) => void;
+  onDone: (r: Reading) => void;
   children: preact.ComponentChildren;
 }) {
   const m = useMeasure();
+  const h = useHighSide(m);
   useWakeLock();
-  const dev = devOf(m.value, p.normal, false);
+  const v = m.value;
+  // 계산용 부호 : B 는 높은 쪽으로, A 는 정상값 부호를 따라간다
+  const signed = v == null ? null : p.isB ? (h.flat ? 0 : h.high ? signedB(v, h.high, p.faDir) : null) : signedA(v, p.normal);
+  const dev = signed == null ? null : signed - p.normal;
   const canHold = m.sensor.status === 'running' && !m.manual;
+  const ready = m.fixed != null && (!p.isB || h.ready);
+  const otherDone = p.isB ? p.done.A : p.done.B;
   return (
     <div class="screen">
       {p.bar}
       <div class="steps">
-        <span class="on" />
-        <span class={p.step >= 2 ? 'on' : ''} />
+        <span class={p.isB || p.done.B ? 'on' : ''} />
+        <span class={!p.isB || p.done.A ? 'on' : ''} />
       </div>
-      <Headline eyebrow={p.eyebrow} title={p.title} sub={p.sub} />
+      <Headline eyebrow={p.isB ? '각도 B · F/A 방향' : '각도 A · T/A 방향'} title={p.title} sub={p.sub} />
       <div class="section" style={{ marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span class="normal-pill num">
-          {p.normalLabel} <b>{fmtSigned(p.normal, 2)}°</b>
+          정상 <b>{p.isB ? bText(p.normal, p.faDir) : fmt(Math.abs(p.normal), 2) + '°'}</b>
         </span>
         <button class="text-btn" onClick={p.onGuide}>
           위치 그림
@@ -311,7 +451,8 @@ function StepScreen(p: {
           </div>
         </div>
       )}
-      <ReadingCard m={m} normal={p.normal} compareAbs={false} normalLabel="정상 대비" />
+      <ReadingCard m={m} normal={p.normal} compareAbs={false} normalLabel="정상 대비" unsigned dev={dev} />
+      {p.isB && <HighPicker m={m} h={h} />}
       <Gauge dev={dev} />
       <RefNote />
       <div class="disclaimer">폰 케이스 · 카메라 돌출부 때문에 옆면이 뜨지 않게 대주세요</div>
@@ -328,8 +469,19 @@ function StepScreen(p: {
                 다시
               </button>
             )}
-            <button class="btn" onClick={() => p.onDone(m.fixed!)}>
-              {p.step === 1 ? '다음' : '결과 보기'}
+            <button
+              class="btn"
+              disabled={!ready}
+              onClick={() =>
+                p.onDone({
+                  v: Math.abs(m.fixed!),
+                  high: p.isB && !h.flat ? h.high ?? undefined : undefined,
+                  at: Date.now(),
+                  manual: m.manual || undefined,
+                })
+              }
+            >
+              {!ready ? '높은 쪽을 골라주세요' : otherDone ? '저장하고 결과 보기' : p.isB ? '저장하고 A 재기' : '저장하고 B 재기'}
             </button>
           </>
         )}
@@ -344,14 +496,22 @@ function ResultScreen(p: {
   block: Block;
   cap: Cap;
   eff: Effective;
-  measA: number;
-  measB: number;
+  rA: Reading;
+  rB: Reading;
+  onFlipB: () => void;
   onRetry: () => void;
+  onSaved: () => void;
   children: preact.ComponentChildren;
 }) {
   const s = useSettings();
   const { block, cap, eff } = p;
-  const r = useMemo(() => analyzeCap(eff.ta, eff.fa, cap.delta, cap.dir, p.measA, p.measB), [eff, cap, p.measA, p.measB]);
+  const normal = capNormalDir(eff.ta, eff.fa, eff.faDir, cap.delta, cap.dir);
+  // 현장 기록(크기 + 높은 쪽) → 계산용 부호
+  const measB = p.rB.high ? signedB(p.rB.v, p.rB.high, eff.faDir) : 0;
+  const measA = signedA(p.rA.v, normal.thetaA);
+  const r = useMemo(() => analyzeCapDir(eff.ta, eff.fa, eff.faDir, cap.delta, cap.dir, measA, measB), [eff, cap, measA, measB]);
+  const flipped = useMemo(() => analyzeCapDir(eff.ta, eff.fa, eff.faDir, cap.delta, cap.dir, measA, -measB), [eff, cap, measA, measB]);
+  const suspect = p.rB.high ? flipSuspect(r, flipped, s.rotTol) : null;
   const verdict = capVerdict(r.rotErr, s);
   const lvl = verdictLevel(verdict);
   const residWarn = r.aResid != null && Math.abs(r.aResid) > s.aResidTol;
@@ -387,6 +547,7 @@ function ResultScreen(p: {
       block: block.block,
       ta: eff.ta,
       fa: eff.fa,
+      faDir: eff.faDir,
       basis: eff.basis,
       mode: 'cap',
       capId: cap.id,
@@ -395,8 +556,9 @@ function ResultScreen(p: {
       dir: cap.dir,
       normalA: r.thetaA,
       normalB: r.thetaB,
-      measA: p.measA,
-      measB: p.measB,
+      measA,
+      measB,
+      highB: p.rB.high,
       errA: r.errA,
       errB: r.errB,
       deltaReal: r.deltaReal,
@@ -406,6 +568,7 @@ function ResultScreen(p: {
       memo: memo.trim(),
       photo: photo ?? undefined,
     });
+    p.onSaved();
     toast('기록을 저장했어요');
     back('/block/' + block.id);
   };
@@ -433,8 +596,26 @@ function ResultScreen(p: {
             허용 회전오차 정하기
           </button>
         )}
-        {verdict === '판정불가' && <p>B 실측값과 폰 방향(▲▼)을 다시 확인해주세요</p>}
+        {verdict === '판정불가' && <p>B 숫자와 높은 쪽(선수/선미)을 다시 확인해주세요</p>}
       </div>
+
+      {suspect != null && (
+        <div class="banner">
+          <IWarn />
+          <div>
+            <b>B 높은 쪽을 반대로 고르지 않았나요?</b>
+            <span class="muted num">
+              {dirName(-p.rB.high! as Dir)} 쪽이 높으면 회전오차가 {fmtSigned(suspect, 2)}° 예요.
+              {Math.abs(cap.delta) < 1e-9 ? ` δ 0° 캡은 보통 ${dirName(faHighSide(eff.faDir))} 쪽이 높아요.` : ''}
+            </span>
+            <div>
+              <button class="text-btn mt8" onClick={p.onFlipB}>
+                {dirName(-p.rB.high! as Dir)} 쪽이 높았어요
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <RefNote />
       <div style={{ height: '16px' }} />
@@ -457,18 +638,18 @@ function ResultScreen(p: {
             <div class="kv">
               <span class="k">계산 기준</span>
               <span class="v num">
-                {basisName(eff.basis)} · T.A {fmt(eff.ta, 2)}° · F.A {fmt(eff.fa, 2)}°
+                {basisName(eff.basis)} · T.A {fmt(eff.ta, 2)}° · F.A {dirName(eff.faDir)} {fmt(eff.fa, 2)}°
               </span>
             </div>
           </div>
           <div class="kv-group">
             <div class="kv">
-              <span class="k">각도 B 실측</span>
-              <span class="v num">{fmtSigned(p.measB, d)}°</span>
+              <span class="k">각도 B 실측{p.rB.manual ? ' (수평계)' : ''}</span>
+              <span class="v num">{bText(measB, eff.faDir, d)}</span>
             </div>
             <div class="kv">
-              <span class="k">정상 θB</span>
-              <span class="v num">{fmtSigned(r.thetaB, d)}°</span>
+              <span class="k">정상 B</span>
+              <span class="v num">{bText(r.thetaB, eff.faDir, d)}</span>
             </div>
             <div class="kv">
               <span class="k">B 각도오차</span>
@@ -478,11 +659,11 @@ function ResultScreen(p: {
           <div class="kv-group">
             <div class="kv">
               <span class="k">각도 A 실측{aWeak ? ' (참고)' : ''}</span>
-              <span class="v num">{fmtSigned(p.measA, d)}°</span>
+              <span class="v num">{fmt(measA, d)}°</span>
             </div>
             <div class="kv">
-              <span class="k">정상 θA</span>
-              <span class="v num">{fmtSigned(r.thetaA, d)}°</span>
+              <span class="k">정상 A</span>
+              <span class="v num">{fmt(r.thetaA, d)}°</span>
             </div>
             <div class="kv">
               <span class="k">A 각도오차</span>
@@ -490,7 +671,7 @@ function ResultScreen(p: {
             </div>
             <div class="kv">
               <span class="k">A 예측 (실제 δ 기준)</span>
-              <span class="v num">{fmtSigned(r.aPred, d)}°</span>
+              <span class="v num">{fmt(r.aPred, d)}°</span>
             </div>
             <div class="kv">
               <span class="k">A 잔차</span>

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { blockAnglesLookRight } from '../../calc/angle';
 import { effectiveAngles, hasDesign, hasRef, type Basis } from '../../calc/basis';
 import { capDirText, fmt, fmtDate, fmtSigned, latestPerCap, sameSignWarning, verdictLevel } from '../../calc/judge';
+import { dirName } from '../../calc/sign';
 import { deleteBlock, duplicateBlock, getBlock, listCaps, listRecordsByBlock, saveBlock, type Block, type Cap, type MeasureRecord } from '../../db/store';
 import { go } from '../router';
 import { ConfirmSheet, Cta, Headline, MenuRow, Seg, Sheet, TopBar, toast } from '../components/ui';
@@ -64,6 +65,7 @@ export function BlockScreen(p: { id: string }) {
     setBlock(nb);
   };
   const goRef = () => go(`/block/${block.id}/ref`);
+  const faName = eff ? (eff.faDirSet ? `FRAME ANGLE · ${dirName(eff.faDir)}` : 'FRAME ANGLE · 방향 미정') : '';
   /** 지금 기준 값 + 아래에 다른 쪽 값 */
   const angleRow = (key: string, name: string, v: number, other: number | null, otherName: string) => (
     <div class="angle-row">
@@ -111,11 +113,11 @@ export function BlockScreen(p: { id: string }) {
             {eff.basis === 'ref'
               ? [
                   angleRow('T.A', 'TRANSVERSE ANGLE', eff.ta, block.ta, '도면'),
-                  angleRow('F.A', 'FRAME ANGLE', eff.fa, block.fa, '도면'),
+                  angleRow('F.A', faName, eff.fa, block.fa, '도면'),
                 ]
               : [
                   angleRow('T.A', 'TRANSVERSE ANGLE', eff.ta, ref ? block.refTa! : null, '현물'),
-                  angleRow('F.A', 'FRAME ANGLE', eff.fa, ref ? block.refFa! : null, '현물'),
+                  angleRow('F.A', faName, eff.fa, ref ? block.refFa! : null, '현물'),
                 ]}
             {odd && <div class="note c-warn">0 &lt; F.A ≤ T.A &lt; 90° 가 아니에요. 정의를 확인해주세요.</div>}
             <div class="card-foot">

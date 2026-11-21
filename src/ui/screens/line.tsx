@@ -1,6 +1,7 @@
 // 일반 부재 측정 (추가 기능) : FRAME 방향 / LONGL. 방향 / 임의각 ψ
 import { useEffect, useState } from 'preact/hooks';
 import { thetaLine, type Dir } from '../../calc/angle';
+import { calcDir } from '../../calc/sign';
 import { effectiveAngles } from '../../calc/basis';
 import { fmt, lineVerdict, parseNum } from '../../calc/judge';
 import { getBlock, newId, saveRecord, type Block } from '../../db/store';
@@ -57,7 +58,7 @@ export function LineScreen(p: { blockId: string }) {
     );
 
   const psi = parseNum(psiText);
-  const normal = mode === 'frame' ? eff.ta : mode === 'longl' ? eff.fa : psi == null ? null : thetaLine(eff.ta, eff.fa, psi, dir);
+  const normal = mode === 'frame' ? eff.ta : mode === 'longl' ? eff.fa : psi == null ? null : thetaLine(eff.ta, eff.fa, psi, calcDir(dir, eff.faDir));
   const refTag = eff.basis === 'ref' ? ' (현물)' : '';
   const label = mode === 'frame' ? 'FRAME 방향' : mode === 'longl' ? 'LONGL. 방향' : `임의각 ψ=${psi ?? ''}° ${dir === 1 ? '선수' : '선미'}`;
   const dev = devOf(m.value, normal, true);
@@ -74,6 +75,7 @@ export function LineScreen(p: { blockId: string }) {
       block: block.block,
       ta: eff.ta,
       fa: eff.fa,
+      faDir: eff.faDir,
       basis: eff.basis,
       mode: 'line',
       lineLabel: label,
@@ -123,7 +125,7 @@ export function LineScreen(p: { blockId: string }) {
           <span style={{ color: 'var(--text-3)', fontSize: '13px' }}>{mode === 'frame' ? '= T.A' + refTag : mode === 'longl' ? '= F.A' + refTag : refTag.trim()}</span>
         </div>
       </div>
-      <ReadingCard m={m} normal={normal} compareAbs={true} normalLabel="편차" />
+      <ReadingCard m={m} normal={normal} compareAbs={true} normalLabel="편차" unsigned />
       <Gauge dev={dev} />
       {normal != null && isFinite(normal) && <LineFigure normal={normal} meas={m.value} />}
       {m.fixed != null && (

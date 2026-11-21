@@ -1,5 +1,6 @@
 // 설정 — 기기별로 다르므로 이 폰의 localStorage 에 둔다
 import { useEffect, useState } from 'preact/hooks';
+import type { Dir } from './calc/angle';
 
 export type Theme = 'system' | 'light' | 'dark';
 
@@ -14,6 +15,7 @@ export interface Settings {
   flipSign: boolean; // ▲▼ 방향 반대로 (기기 센서 부호가 다를 때)
   theme: Theme;
   offset: number | null; // 영점 보정값 (°)
+  headDir: Dir; // B · LONGL. 라인 잴 때 폰 머리가 향한 쪽 (마지막 고른 값)
 }
 
 export const DEFAULTS: Settings = {
@@ -27,6 +29,7 @@ export const DEFAULTS: Settings = {
   flipSign: false,
   theme: 'system',
   offset: null,
+  headDir: 1,
 };
 
 const KEY = 'tiltcheck.settings.v1';

@@ -7,9 +7,11 @@ export interface Block {
   ship: string; // 호선
   block: string; // 블록
   ta: number | null; // T.A TRANSVERSE ANGLE (도면, 모르면 null)
-  fa: number | null; // F.A FRAME ANGLE (도면, 모르면 null)
+  fa: number | null; // F.A FRAME ANGLE (도면 크기, 모르면 null)
+  faDir?: Dir; // 도면 F.A 방향 선수 +1 / 선미 −1 (예전 블록은 없음 = 선수로 계산)
   refTa?: number; // 현물 T.A — DECK 상면 FRAME 라인을 폰으로 잰 값
   refFa?: number; // 현물 F.A — CENTER LINE 과 평행한 LONGL. 라인을 폰으로 잰 값
+  refFaDir?: Dir; // 현물에서 잰 F.A 방향 (LONGL. 라인 높은 쪽의 반대)
   refAt?: number; // 현물값을 잰 시각
   basis?: Basis; // 계산 기준 (도면 / 현물)
   memo: string;
@@ -35,7 +37,8 @@ export interface MeasureRecord {
   ship: string;
   block: string;
   ta: number; // 계산에 쓴 T.A
-  fa: number; // 계산에 쓴 F.A
+  fa: number; // 계산에 쓴 F.A (크기)
+  faDir?: Dir; // 계산에 쓴 F.A 방향 (예전 기록은 없음 = 선수)
   basis?: Basis; // 그때 쓴 기준 (예전 기록은 없음 = 도면)
   mode: 'cap' | 'line';
   // 지주캡
@@ -46,7 +49,8 @@ export interface MeasureRecord {
   normalA?: number;
   normalB?: number;
   measA?: number;
-  measB?: number;
+  measB?: number; // 계산용 부호 붙은 B (+ = F.A 반대쪽이 높음)
+  highB?: Dir; // B 를 잴 때 높았던 쪽 (현장 기록 그대로)
   errA?: number;
   errB?: number;
   deltaReal?: number | null;
@@ -136,7 +140,7 @@ export async function duplicateBlock(id: string): Promise<Block | undefined> {
   if (!b) return;
   const now = Date.now();
   // 현물값은 그 블록 현물에서 잰 값이라 복제본에는 옮기지 않는다
-  const { refTa: _t, refFa: _f, refAt: _a, basis: _b, ...rest } = b;
+  const { refTa: _t, refFa: _f, refFaDir: _d, refAt: _a, basis: _b, ...rest } = b;
   const copy: Block = { ...rest, id: newId(), block: b.block + ' 복사', createdAt: now, updatedAt: now };
   await saveBlock(copy);
   for (const c of await listCaps(id)) await saveCap({ ...c, id: newId(), blockId: copy.id, createdAt: Date.now() });

@@ -1067,9 +1067,13 @@ textarea.input {
 }
 .kv .k {
   color: var(--text-3);
+  flex: none;
+  white-space: nowrap;
 }
 .kv .v {
   font-weight: 600;
+  text-align: right;
+  padding-left: 12px;
 }
 .kv-group + .kv-group {
   border-top: 1px solid var(--line);
@@ -1120,6 +1124,53 @@ textarea.input {
 
 .center {
   text-align: center;
+}
+
+/* 높은 쪽 고르기 (B · LONGL. 라인) */
+.high-pick {
+  margin: 14px 20px 0;
+}
+.high-k {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-3);
+  margin: 0 4px 8px;
+}
+.high-k em {
+  font-style: normal;
+  color: var(--text-2);
+}
+.high-k em b {
+  color: var(--blue);
+}
+.dir-seg button {
+  height: 48px;
+  font-size: 16px;
+}
+.dir-seg button.on {
+  color: var(--blue);
+}
+
+/* 측정 순서 (지주캡 · 현물 기준) — 잰 값은 단계마다 저장 */
+.row .saved {
+  text-align: right;
+  line-height: 1.25;
+}
+.row .saved b {
+  display: block;
+  font-size: 17px;
+  color: var(--text);
+}
+.row .saved span {
+  font-size: 13px;
+  color: var(--text-3);
+}
+.row .lead.done {
+  background: var(--blue);
+  color: #fff;
 }
 .mt8 {
   margin-top: 8px;
