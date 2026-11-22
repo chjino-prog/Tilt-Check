@@ -2,8 +2,8 @@
 import { useEffect, useState } from 'preact/hooks';
 import { blockAnglesLookRight } from '../../calc/angle';
 import { effectiveAngles, hasDesign, hasRef, type Basis } from '../../calc/basis';
-import { capDirText, fmt, fmtDate, fmtSigned, latestPerCap, sameSignWarning, verdictLevel } from '../../calc/judge';
-import { dirName } from '../../calc/sign';
+import { capDirText, fmt, fmtDate, isLegacyCap, latestPerCap, sameSignWarning, verdictLevel } from '../../calc/judge';
+import { dirName, rotText } from '../../calc/sign';
 import { deleteBlock, duplicateBlock, getBlock, listCaps, listRecordsByBlock, saveBlock, type Block, type Cap, type MeasureRecord } from '../../db/store';
 import { go } from '../router';
 import { ConfirmSheet, Cta, Headline, MenuRow, Seg, Sheet, TopBar, toast } from '../components/ui';
@@ -18,9 +18,9 @@ export function SameSignBanner(p: { records: MeasureRecord[] }) {
       <IWarn />
       <div>
         <b>
-          캡 {w.count}개의 회전오차가 모두 {w.sign > 0 ? '+' : '−'} 쪽이에요
+          캡 {w.count}개가 모두 {w.sign > 0 ? '선수' : '선미'} 쪽으로 돌았어요
         </b>
-        <span class="muted">마킹 기준 · 방향(선수/선미) · 블록 세팅을 확인해주세요</span>
+        <span class="muted">캡마다 따로 틀어진 게 아니라 마킹 기준 · 방향(선수/선미) · 블록 세팅이 틀어졌을 수 있어요</span>
       </div>
     </div>
   );
@@ -152,11 +152,12 @@ export function BlockScreen(p: { id: string }) {
                   <div class="t1">캡 {c.no}</div>
                   <div class="t2 num">
                     δ {Number(c.delta.toFixed(3))}° {capDirText(c.delta, c.dir)}
-                    {r?.rotErr != null && ` · 회전 ${fmtSigned(r.rotErr, 2)}°`}
+                    {r?.rotErr != null && !isLegacyCap(r) && ` · ${rotText(r.rotErr, c.delta, r.dir ?? c.dir)}`}
                   </div>
                 </div>
                 <div class="tail">
                   {r?.basis === 'ref' && <span class="badge blue">현물</span>}
+                  {r && isLegacyCap(r) && <span class="badge">이전 방식</span>}
                   {r ? <span class={'badge ' + verdictLevel(r.verdict)}>{r.verdict}</span> : <span class="badge">미측정</span>}
                   <span class="chev">
                     <IChevron />

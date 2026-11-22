@@ -1,7 +1,7 @@
 // 실측값 카드 : 센서 값(또는 직접 입력) + 안정 표시 + HOLD(화면 탭)
 import { useState } from 'preact/hooks';
 import { tilt, useTilt, vibrate, type TiltState } from '../../sensor/tilt';
-import { setSettings, useSettings } from '../../settings';
+import { useSettings } from '../../settings';
 import { devLevel, fmt, fmtSigned, parseNum } from '../../calc/judge';
 import type { Dir } from '../../calc/angle';
 import { dirName, highFromPhone } from '../../calc/sign';
@@ -23,7 +23,8 @@ export interface Measure {
   reset: () => void;
 }
 
-export function useMeasure(): Measure {
+/** block : 값을 고정하기 전에 먼저 해야 할 일 (예: 폰 머리 방향 확인). 있으면 고정을 막고 이 글을 띄운다 */
+export function useMeasure(block?: string | null): Measure {
   const sensor = useTilt();
   const [held, setHeld] = useState<number | null>(null);
   const [manualPick, setManual] = useState(false);
@@ -38,6 +39,7 @@ export function useMeasure(): Measure {
   const hold = () => {
     if (manual || held != null) return;
     if (sensor.status !== 'running' || sensor.angle == null) return;
+    if (block) return toast(block);
     if (sensor.moving) return toast('움직이고 있어요. 폰을 부재에 대고 멈춰주세요');
     if (!sensor.stable) return toast('아직 흔들려요. 잠시 그대로 대주세요');
     setHeld(sensor.angle);
@@ -193,6 +195,30 @@ function DevLine(p: { dev: number | null; lvl: string; decimals: number; normalL
 }
 
 // ── 높은 쪽 (B · LONGL. 라인) — 부호 대신 "어느 쪽이 높은지"만 받는다
+// 폰으로 잴 때는 폰 머리를 늘 선수 쪽으로 두게 지시하고, 잴 때마다 확인을 받는다.
+// (지난번 고른 방향을 그대로 쓰면, 폰을 반대로 댔을 때 높은 쪽이 소리 없이 뒤집힌다)
+
+export interface Head {
+  dir: Dir; // 폰 머리(카메라 쪽)가 향한 쪽 — 기본 선수
+  ok: boolean; // 이번 측정에서 확인했는지
+  confirm: () => void;
+  flip: () => void;
+}
+
+export function useHead(): Head {
+  const [dir, setDir] = useState<Dir>(1);
+  const [ok, setOk] = useState(false);
+  return {
+    dir,
+    ok,
+    confirm: () => setOk(true),
+    flip: () => {
+      setDir((d) => (-d as Dir));
+      setOk(true);
+    },
+  };
+}
+
 export interface HighSide {
   high: Dir | null; // 결과 : 높은 쪽
   flat: boolean; // 거의 수평 (높은 쪽 필요 없음)
@@ -201,32 +227,95 @@ export interface HighSide {
   setPicked: (d: Dir) => void;
 }
 
-export function useHighSide(m: Measure, initial?: Dir | null): HighSide {
-  const s = useSettings();
+export function useHighSide(m: Measure, head: Head, initial?: Dir | null): HighSide {
   const [picked, setPicked] = useState<Dir | null>(initial ?? null);
   const v = m.value;
   const flat = v != null && Math.abs(v) < 0.005;
-  const high = v == null || flat ? null : m.manual ? picked : highFromPhone(v, s.headDir);
+  const high = v == null || flat ? null : m.manual ? picked : head.ok ? highFromPhone(v, head.dir) : null;
   return { high, flat, ready: v != null && (flat || high != null), picked, setPicked };
 }
 
-function DirSeg(p: { value: Dir | null; onChange: (d: Dir) => void }) {
+/** 위에서 본 배 + 폰 (머리 방향 화살표) */
+function HullFigure(p: { head: Dir }) {
+  const up = p.head === 1;
   return (
-    <div class="seg dir-seg">
+    <svg class="hull-fig" viewBox="0 0 86 140" role="img" aria-label={`배 윗면 그림 : 폰 머리(카메라)가 ${dirName(p.head)}를 향함`}>
+      <path d="M43 18 C62 34 72 50 72 74 L72 124 L14 124 L14 74 C14 50 24 34 43 18 Z" class="hull" />
+      <text x="43" y="12" text-anchor="middle" class={'hull-t' + (up ? ' on' : '')}>
+        선수
+      </text>
+      <text x="43" y="136" text-anchor="middle" class={'hull-t' + (!up ? ' on' : '')}>
+        선미
+      </text>
+      <g transform={up ? undefined : 'rotate(180 43 73)'}>
+        <rect x="33" y="46" width="20" height="54" rx="5" class="phone" />
+        <circle cx="43" cy="53" r="3.5" class="cam" />
+        <path d="M43 42 L43 32 M38 36 L43 30 L48 36" class="arrow" />
+      </g>
+    </svg>
+  );
+}
+
+/** 폰 머리 방향 카드 — 센서로 높은 쪽을 정할 때만. 확인 전에는 고정을 막는다 */
+export function HeadCard(p: { m: Measure; head: Head }) {
+  const { m, head } = p;
+  if (m.manual || m.sensor.status !== 'running') return null;
+  return (
+    <div class={'head-card' + (head.ok ? ' ok' : '')}>
+      <HullFigure head={head.dir} />
+      <div class="head-body">
+        <div class="head-t">카메라 쪽 → {dirName(head.dir)}</div>
+        {head.ok ? (
+          <>
+            <div class="head-s">{dirName(head.dir)} 쪽으로 댄 것으로 계산해요</div>
+            <button class="text-btn" onClick={head.flip}>
+              {dirName(-head.dir as Dir)} 쪽으로 댔어요
+            </button>
+          </>
+        ) : (
+          <>
+            <div class="head-s">반대로 대면 높은 쪽이 뒤집혀 판정이 틀려요</div>
+            <button class="btn small" onClick={head.confirm}>
+              네, {dirName(head.dir)} 쪽으로 댔어요
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** 높은 쪽 큰 버튼 두 개 */
+function HighButtons(p: { value: Dir | null; onChange: (d: Dir) => void }) {
+  return (
+    <div class="high-btns">
       {([1, -1] as Dir[]).map((d) => (
-        <button class={p.value === d ? 'on' : ''} onClick={() => p.onChange(d)}>
-          {dirName(d)} 쪽
+        <button class={p.value === d ? 'on' : ''} aria-pressed={p.value === d} onClick={() => p.onChange(d)}>
+          <b>
+            {d === 1 ? '▲' : '▼'} {dirName(d)} 쪽
+          </b>
+          <span>{dirName(d)}가 높음</span>
         </button>
       ))}
     </div>
   );
 }
 
-/** 센서 : 폰 머리가 향한 쪽을 고르면 높은 쪽은 앱이 정함 / 직접 입력 : 높은 쪽을 직접 고름 */
-export function HighPicker(p: { m: Measure; h: HighSide }) {
-  const s = useSettings();
-  const { m, h } = p;
+/**
+ * 센서 : 폰 머리 방향을 확인하면 높은 쪽을 크게 알려줌 / 직접 입력 : 높은 쪽을 직접 고름
+ * summary : 저장될 내용을 한 줄로 (예: '선미 쪽이 1.60° 높음')
+ */
+export function HighPicker(p: { m: Measure; h: HighSide; head: Head; summary?: string | null; sub?: string | null }) {
+  const { m, h, head } = p;
   if (!m.manual && m.sensor.status !== 'running') return null; // 센서 켜기 전에는 숨김
+  const saved =
+    p.summary && (h.high != null || h.flat) ? (
+      <div class="save-box">
+        <span>이렇게 저장돼요</span>
+        <b>{p.summary}</b>
+        {p.sub && <em>{p.sub}</em>}
+      </div>
+    ) : null;
   if (m.manual) {
     return (
       <div class="high-pick">
@@ -234,17 +323,23 @@ export function HighPicker(p: { m: Measure; h: HighSide }) {
           <span>어느 쪽이 높아요?</span>
           {h.flat && <em>수평이라 안 골라도 돼요</em>}
         </div>
-        <DirSeg value={h.picked} onChange={h.setPicked} />
+        <HighButtons value={h.picked} onChange={h.setPicked} />
+        {saved}
       </div>
     );
   }
   return (
     <div class="high-pick">
-      <div class="high-k">
-        <span>폰 머리(카메라 쪽)가 향한 쪽</span>
-        <em>{h.high ? <><b>{dirName(h.high)} 쪽</b>이 높아요</> : h.flat ? '거의 수평이에요' : ''}</em>
-      </div>
-      <DirSeg value={s.headDir} onChange={(d) => setSettings({ headDir: d })} />
+      {!head.ok ? (
+        <div class="high-wait">방향을 확인하면 높은 쪽을 알려드려요</div>
+      ) : h.high ? (
+        <div class="high-now">
+          {h.high === 1 ? '▲' : '▼'} {dirName(h.high)} 쪽이 높아요
+        </div>
+      ) : h.flat ? (
+        <div class="high-now flat">거의 수평이에요</div>
+      ) : null}
+      {saved}
     </div>
   );
 }

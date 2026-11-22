@@ -1,0 +1,551 @@
+/* 지주캡 보고서 (A4 한 장, 결재용) — 종이는 테마와 상관없이 흰 바탕
+   글꼴 : 본문 HD Light · 제목 HD Bold · 강조 HD Medium, 없으면 맑은 고딕 → 기기 기본 글꼴
+   색 : 회사 문서 색 (남색 머리 · 초록 OK · 빨강 NG), A(T/A) 파랑 · B(F/A) 주황은 측정 방향 그림과 같게 */
+@font-face {
+  font-family: 'RptL';
+  src: local('HD Light'), local('HD-Light');
+  font-weight: 300;
+}
+@font-face {
+  font-family: 'RptM';
+  src: local('HD Medium'), local('HD-Medium');
+  font-weight: 500;
+}
+@font-face {
+  font-family: 'RptB';
+  src: local('HD Bold'), local('HD-Bold');
+  font-weight: 700;
+}
+.rpt-preview {
+  padding: 4px 20px 8px;
+}
+.rpt-scale {
+  overflow: hidden;
+  border-radius: 4px;
+  box-shadow: 0 1px 2px rgba(20, 30, 50, 0.08), 0 6px 24px rgba(20, 30, 50, 0.14);
+}
+.rpt-sheet {
+  --navy: #1b2a4a;
+  --navy-bg: #f4f6f9;
+  --r-red: #d0342c;
+  --r-red-bg: #fdeeed;
+  --r-green: #2e8b4e;
+  --r-green-bg: #eaf6ee;
+  --r-orange: #e08a00;
+  --r-orange-bg: #fff4e0;
+  --ink: #1f2328;
+  --sub: #6b7280;
+  --rule: #d5dae1;
+  --ta: #1d5fd1;
+  --fa: #e06a1b;
+  --fL: 'RptL', 'Malgun Gothic', '맑은 고딕', sans-serif;
+  --fM: 'RptM', 'Malgun Gothic', '맑은 고딕', sans-serif;
+  --fB: 'RptB', 'Malgun Gothic', '맑은 고딕', sans-serif;
+  width: 794px;
+  height: 1119px; /* 296mm — 인쇄 때와 같은 높이 */
+  overflow: hidden;
+  background: #fff;
+  color: var(--ink);
+  padding: 34px 38px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  font-family: var(--fL);
+  font-weight: 300;
+  font-size: 14px;
+  line-height: 1.4;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.rpt-sheet * {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.rpt-sheet > * {
+  flex-shrink: 0;
+}
+.rpt-sheet table {
+  border-collapse: collapse;
+  width: 100%;
+}
+.rpt-sub {
+  color: var(--sub);
+  font-size: 12px;
+}
+.rpt-tag {
+  display: inline-block;
+  font-family: var(--fM);
+  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--navy);
+  border: 1.5px solid var(--navy);
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+.rpt-title {
+  font-family: var(--fB);
+  font-weight: 700;
+  color: var(--navy);
+  font-size: 31px;
+  letter-spacing: -0.01em;
+  margin: 6px 0 0;
+  line-height: 1.15;
+}
+.rpt-info {
+  border-top: 2px solid var(--navy);
+}
+.rpt-info th {
+  font-family: var(--fM);
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--navy);
+  background: var(--navy-bg);
+  text-align: left;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--rule);
+  white-space: nowrap;
+  width: 1%;
+}
+.rpt-info td {
+  font-size: 15px;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--rule);
+}
+.rpt-info td.big {
+  font-family: var(--fB);
+  font-weight: 700;
+  font-size: 19px;
+  color: var(--navy);
+}
+.rpt-info td.blank {
+  width: 110px;
+}
+.rpt-hero {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr 1.1fr 1.6fr;
+  border: 2px solid var(--navy);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.rpt-hero > div {
+  padding: 8px 14px;
+  border-right: 1px solid var(--rule);
+  display: grid;
+  gap: 2px;
+  align-content: center;
+}
+.rpt-hero > div:last-child {
+  border-right: 0;
+}
+.rpt-hero .k {
+  font-family: var(--fM);
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--sub);
+}
+.rpt-hero .v {
+  font-family: var(--fB);
+  font-weight: 700;
+  font-size: 36px;
+  line-height: 1.05;
+}
+.rpt-hero .v small {
+  font-size: 16px;
+  margin-left: 2px;
+}
+.rpt-hero .s {
+  font-size: 12px;
+  color: var(--sub);
+}
+.rpt-hero .s.warn {
+  color: var(--r-orange);
+}
+.rpt-hero .bad {
+  background: var(--r-red-bg);
+}
+.rpt-hero .bad .k {
+  color: var(--r-red);
+}
+.rpt-hero .worst .v {
+  font-size: 24px;
+}
+.rpt-sheet .ok {
+  color: var(--r-green);
+}
+.rpt-sheet .ng {
+  color: var(--r-red);
+}
+.rpt-band {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--navy);
+  color: #fff;
+  border-radius: 4px;
+  padding: 5px 10px;
+  font-family: var(--fM);
+  font-weight: 500;
+  font-size: 14px;
+}
+.rpt-band .n {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  color: var(--navy);
+  display: grid;
+  place-items: center;
+  font-family: var(--fB);
+  font-weight: 700;
+  font-size: 12px;
+}
+.rpt-band .r {
+  margin-left: auto;
+  font-size: 11.5px;
+  opacity: 0.85;
+  font-family: var(--fL);
+  font-weight: 300;
+}
+.rpt-basis th {
+  font-family: var(--fM);
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--sub);
+  text-align: center;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--rule);
+}
+.rpt-basis th.used {
+  color: var(--navy);
+}
+.rpt-basis td {
+  text-align: center;
+  padding: 3px 6px;
+  border-bottom: 1px solid var(--rule);
+}
+.rpt-basis td.used {
+  background: var(--navy-bg);
+}
+.rpt-basis td.lab {
+  text-align: left;
+  font-family: var(--fB);
+  font-weight: 700;
+  font-size: 18px;
+  width: 64px;
+}
+.rpt-basis td.lab.ta {
+  color: var(--ta);
+}
+.rpt-basis td.lab.fa {
+  color: var(--fa);
+}
+.rpt-basis td.m {
+  font-family: var(--fM);
+  font-weight: 500;
+}
+.rpt-basis .num-b {
+  font-family: var(--fB);
+  font-weight: 700;
+  font-size: 24px;
+}
+.rpt-basis small {
+  font-family: var(--fM);
+  font-weight: 500;
+  font-size: 14px;
+  margin-left: 4px;
+}
+.rpt-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  color: #fff;
+  font-family: var(--fB);
+  font-weight: 700;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+.rpt-mark.ok {
+  background: var(--r-green);
+}
+.rpt-mark.warn {
+  background: var(--r-orange);
+}
+.rpt-mark.bad {
+  background: var(--r-red);
+}
+.rpt-note {
+  font-size: 12.5px;
+  border-radius: 4px;
+  padding: 6px 10px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.rpt-note.ok {
+  background: var(--r-green-bg);
+}
+.rpt-note.warn {
+  background: var(--r-orange-bg);
+}
+.rpt-note.bad {
+  background: var(--r-red-bg);
+}
+.rpt-figs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.rpt-fig {
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.rpt-fig .img {
+  height: 66px;
+  display: grid;
+  place-items: center;
+  background: #fff;
+}
+.rpt-fig .crop {
+  height: 100%;
+  background-repeat: no-repeat;
+}
+/* 측정 방향 그림(cap-guide.webp 1400×908)에서 네 칸 잘라 쓰기 */
+.rpt-fig .crop.ts-ta,
+.rpt-fig .crop.ts-fa {
+  aspect-ratio: 684 / 328;
+}
+.rpt-fig .crop.psa-ta,
+.rpt-fig .crop.psa-fa {
+  aspect-ratio: 684 / 342;
+}
+.rpt-fig .crop.ts-ta {
+  background-size: 204.68% auto;
+  background-position: 1.12% 17.59%;
+}
+.rpt-fig .crop.ts-fa {
+  background-size: 205.28% auto;
+  background-position: 99.16% 17.59%;
+}
+.rpt-fig .crop.psa-ta {
+  background-size: 204.68% auto;
+  background-position: 1.12% 86.93%;
+}
+.rpt-fig .crop.psa-fa {
+  background-size: 205.28% auto;
+  background-position: 99.16% 86.93%;
+}
+.rpt-fig .cap {
+  font-size: 11px;
+  padding: 4px 8px;
+  background: var(--navy-bg);
+  display: grid;
+  line-height: 1.35;
+}
+.rpt-fig .cap b {
+  font-family: var(--fM);
+  font-weight: 500;
+  font-size: 12.5px;
+}
+.rpt-fig.ta .cap b {
+  color: var(--ta);
+}
+.rpt-fig.fa .cap b {
+  color: var(--fa);
+}
+.rpt-res th {
+  font-family: var(--fM);
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--navy);
+  background: var(--navy-bg);
+  border-top: 2px solid var(--navy);
+  border-bottom: 1px solid var(--navy);
+  padding: 6px;
+  text-align: center;
+  white-space: nowrap;
+}
+.rpt-res td {
+  border-bottom: 1px solid var(--rule);
+  padding: 4px 6px;
+  text-align: center;
+  font-size: 15px;
+}
+.rpt-res .l {
+  text-align: left;
+}
+.rpt-res th.l {
+  padding-left: 10px;
+}
+.rpt-res .nowrap {
+  white-space: nowrap;
+}
+.rpt-res td.capno {
+  font-family: var(--fB);
+  font-weight: 700;
+  font-size: 17px;
+  color: var(--navy);
+  text-align: left;
+  padding-left: 10px;
+}
+.rpt-res tr.isng td {
+  background: var(--r-red-bg);
+}
+.rpt-res tr.iswarn td {
+  background: var(--r-orange-bg);
+}
+.rpt-res tr.none td {
+  color: var(--sub);
+}
+.rpt-res .val {
+  font-family: var(--fM);
+  font-weight: 500;
+}
+.rpt-res .rot {
+  font-family: var(--fB);
+  font-weight: 700;
+  font-size: 17px;
+}
+.rpt-res .s {
+  font-size: 12px;
+}
+.rpt-pill {
+  display: inline-grid;
+  place-items: center;
+  min-width: 52px;
+  height: 28px;
+  border-radius: 999px;
+  font-family: var(--fB);
+  font-weight: 700;
+  font-size: 15px;
+  padding: 0 10px;
+  border: 1.5px solid var(--rule);
+  color: var(--sub);
+}
+.rpt-pill.ok {
+  background: var(--r-green-bg);
+  color: var(--r-green);
+  border-color: var(--r-green);
+}
+.rpt-pill.ng {
+  background: var(--r-red);
+  color: #fff;
+  border-color: var(--r-red);
+}
+.rpt-memo {
+  flex: 1 0 40px;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--sub);
+}
+.rpt-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--sub);
+  border-top: 1px solid var(--rule);
+  padding-top: 6px;
+}
+
+/* 캡이 많아 넘치면 단계별로 : 줄 간격 줄임 → 표를 두 줄로 → 그림 작게 → 그림 뺌 */
+.rpt-sheet.tight .rpt-res td {
+  padding: 2px 6px;
+}
+.rpt-sheet.tight .rpt-res .rpt-pill {
+  height: 24px;
+  font-size: 13px;
+}
+.rpt-sheet.figs-s .rpt-fig .img {
+  height: 48px;
+}
+.rpt-sheet.figs-none .rpt-fig .img {
+  display: none;
+}
+.rpt-sheet.figs-none .rpt-memo {
+  flex-basis: 24px;
+}
+
+/* 결과표를 두 줄로 */
+.rpt-res2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  align-items: start;
+}
+.rpt-sheet.two .rpt-res td {
+  padding: 1px 4px;
+  font-size: 13px;
+}
+.rpt-sheet.two .rpt-res th {
+  padding: 4px;
+}
+.rpt-sheet.two .rpt-res td.capno {
+  padding-left: 6px;
+  font-size: 14px;
+}
+.rpt-sheet.two .rpt-res .rot {
+  font-size: 14px;
+}
+.rpt-sheet.two .rpt-res .s {
+  font-size: 11px;
+}
+.rpt-sheet.two .rpt-res .rpt-pill {
+  min-width: 40px;
+  height: 18px;
+  font-size: 12px;
+  padding: 0 6px;
+}
+
+/* 인쇄 · PDF 저장 : 보고서 종이만, A4 한 장 원래 크기로 */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+  html,
+  body {
+    background: #fff !important;
+  }
+  /* styles.css 가 이 파일보다 늦게 붙을 수 있어 !important 로 */
+  #app {
+    max-width: none !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+  }
+  #app .screen {
+    padding: 0 !important;
+    animation: none !important;
+  }
+  #app .screen > :not(.rpt-preview),
+  .rpt-preview .banner,
+  .cta,
+  .tabbar,
+  .toast,
+  .sheet,
+  .sheet-dim {
+    display: none !important;
+  }
+  .rpt-preview {
+    padding: 0 !important;
+  }
+  .rpt-scale {
+    height: auto !important;
+    box-shadow: none;
+    border-radius: 0;
+    overflow: visible;
+  }
+  .rpt-sheet {
+    zoom: 1 !important;
+    width: 210mm;
+    height: 296mm;
+    break-inside: avoid;
+  }
+}

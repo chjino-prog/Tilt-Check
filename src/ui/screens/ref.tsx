@@ -11,7 +11,7 @@ import { useSettings } from '../../settings';
 import { useWakeLock } from '../../sensor/tilt';
 import { back } from '../router';
 import { Cta, Headline, RefNote, RefWarningSheet, Sheet, TopBar, toast } from '../components/ui';
-import { HighPicker, ReadingCard, useHighSide, useMeasure } from '../components/reading';
+import { HeadCard, HighPicker, ReadingCard, useHead, useHighSide, useMeasure } from '../components/reading';
 import { IBack, ICheck, IChevron, IInfo, IWarn } from '../icons';
 
 type Stage = 'hub' | 'ta' | 'fa' | 'done';
@@ -192,10 +192,16 @@ function RefStep(p: {
   onDone: (r: Reading) => void;
   children: preact.ComponentChildren;
 }) {
-  const m = useMeasure();
-  const h = useHighSide(m);
+  const head = useHead();
+  // F.A 를 센서로 잴 때는 폰 머리 방향을 확인해야 고정할 수 있다 (틀리면 블록 F.A 방향이 뒤집힘)
+  const m = useMeasure(!p.isTa && !head.ok ? '먼저 폰 머리 방향을 확인해주세요' : null);
+  const h = useHighSide(m, head);
   useWakeLock();
-  const canHold = m.sensor.status === 'running' && !m.manual;
+  const needHead = !p.isTa && !m.manual && m.sensor.status === 'running' && !head.ok;
+  const canHold = m.sensor.status === 'running' && !m.manual && !needHead;
+  const v = m.value;
+  const summary = p.isTa || v == null ? null : h.flat ? '수평 (F.A 0°)' : h.high ? `${dirName(h.high)} 쪽이 ${fmt(Math.abs(v), 2)}° 높음` : null;
+  const faSub = !p.isTa && h.high ? `→ F.A ${dirName(-h.high as Dir)} ${fmt(Math.abs(v!), 2)}°` : null;
   const ready = m.fixed != null && (p.isTa || h.ready);
   const otherDone = p.isTa ? p.done.fa : p.done.ta;
   return (
@@ -205,7 +211,7 @@ function RefStep(p: {
         <span class={p.isTa || p.done.ta ? 'on' : ''} />
         <span class={!p.isTa || p.done.fa ? 'on' : ''} />
       </div>
-      <Headline eyebrow={p.isTa ? '1/2 · T.A' : '2/2 · F.A'} title={p.title} sub={p.sub} />
+      <Headline eyebrow={p.isTa ? '1/2 · T.A' : '2/2 · F.A'} title={!p.isTa && !m.manual && m.sensor.status === 'running' ? `폰 머리를 ${dirName(head.dir)} 쪽으로 대주세요` : p.title} sub={p.sub} />
       <div class="section" style={{ marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span class="normal-pill num">
           {p.design != null ? (
@@ -221,15 +227,16 @@ function RefStep(p: {
         </button>
       </div>
       {/* 도면값이 있으면 도면 대비 차이를 보여주고, 없으면 값만 */}
+      {!p.isTa && <HeadCard m={m} head={head} />}
       <ReadingCard m={m} normal={p.design} compareAbs={true} normalLabel="도면 대비" unsigned />
-      {!p.isTa && <HighPicker m={m} h={h} />}
+      {!p.isTa && <HighPicker m={m} h={h} head={head} summary={summary} sub={faSub} />}
       <RefNote />
       <div class="disclaimer">{p.note}</div>
       <RefWarningSheet />
       <Cta>
         {m.fixed == null ? (
           <button class="btn" disabled={m.manual || !canHold} onClick={m.hold}>
-            {m.manual ? '값을 입력해주세요' : '고정하기'}
+            {m.manual ? '값을 입력해주세요' : needHead ? '폰 머리 방향을 먼저 확인해주세요' : '고정하기'}
           </button>
         ) : (
           <>
@@ -309,12 +316,43 @@ function RefResult(p: { bar: preact.JSX.Element; block: Block; rTa: Reading; rFa
         <h1>{dirClash ? 'F.A 방향이 도면과 반대예요' : far ? '도면값과 많이 달라요' : '현물 기준을 잡았어요'}</h1>
         <p>{far || dirClash ? '기준 부재 위치와 높은 쪽을 한 번 더 확인해주세요' : '이 블록 측정은 이제 이 값으로 계산해요'}</p>
       </div>
+      <div class="section">
+        <div class="fa-dir-card">
+          <svg viewBox="0 0 96 96" role="img" aria-label={`옆에서 본 LONGL. 라인 : ${p.rFa.high ? dirName(p.rFa.high) + ' 쪽이 높음' : '수평'}`}>
+            <text x="6" y="20" class="t on">
+              {p.rFa.high === -1 ? '선미' : '선수'}
+            </text>
+            <text x="62" y="88" class="t">
+              {p.rFa.high === -1 ? '선수' : '선미'}
+            </text>
+            <path d={p.rFa.high ? 'M10 36 L86 66' : 'M10 56 L86 56'} class="line" />
+            <path d="M10 66 L86 66" class="base" />
+            {p.rFa.high && <path d="M18 30 L18 16 M13 21 L18 15 L23 21" class="arrow" />}
+          </svg>
+          <div>
+            <span>LONGL. 라인 잰 결과</span>
+            <b class="num">{p.rFa.high ? `${dirName(p.rFa.high)} 쪽이 ${fmt(refFa, 2)}° 높음` : '수평'}</b>
+            <i />
+            <span>그래서 저장되는 값</span>
+            <strong class="num">{refFaDir ? `F.A ${dirName(refFaDir)} ${fmt(refFa, 2)}°` : `F.A ${fmt(refFa, 2)}°`}</strong>
+          </div>
+        </div>
+      </div>
+      {!design && refFa > 0.05 && (
+        <div class="alert warn">
+          <IWarn />
+          <div>
+            <b>도면값이 없어 방향을 맞춰볼 수 없어요</b>
+            <span>잴 때 폰 머리가 정한 쪽이었는지, 실제로 {p.rFa.high ? dirName(p.rFa.high) : ''} 쪽이 높았는지 눈으로 한 번 더 봐주세요</span>
+          </div>
+        </div>
+      )}
       <div class="section ref-cmp num">
         {card('T.A', refTa, design ? Math.abs(block.ta!) : null, lTa, dTa)}
         {card('F.A ' + (refFaDir ? dirName(refFaDir) : ''), refFa, design ? Math.abs(block.fa!) : null, lFa, dFa)}
       </div>
       {dirClash && (
-        <div class="banner">
+        <div class="alert bad">
           <IWarn />
           <div>
             <b>
@@ -356,7 +394,7 @@ function RefResult(p: { bar: preact.JSX.Element; block: Block; rTa: Reading; rFa
           다시 재기
         </button>
         <button class="btn" disabled={saving} onClick={save}>
-          이 기준 쓰기
+          {p.rFa.high ? `${dirName(p.rFa.high)}가 높았어요 · 저장` : '이 기준 쓰기'}
         </button>
       </Cta>
     </div>

@@ -9,6 +9,7 @@ import { BlockScreen } from './ui/screens/block';
 import { CapScreen } from './ui/screens/cap';
 import { LineScreen } from './ui/screens/line';
 import { RefScreen } from './ui/screens/ref';
+import { ReportScreen } from './ui/screens/report';
 import { BlockRecordsScreen, RecordsScreen } from './ui/screens/records';
 import { CalibrateScreen, SettingsScreen } from './ui/screens/settings';
 
@@ -69,6 +70,7 @@ export function App() {
   else if ((m = match('/block/:id/line', path))) screen = <LineScreen key={m.id} blockId={m.id} />;
   else if ((m = match('/block/:id/ref', path))) screen = <RefScreen key={m.id} blockId={m.id} />;
   else if ((m = match('/records/:id', path))) screen = <BlockRecordsScreen key={m.id} blockId={m.id} />;
+  else if ((m = match('/records/:id/report', path))) screen = <ReportScreen key={m.id} blockId={m.id} />;
   else {
     screen = <HomeScreen />;
     tab = true;

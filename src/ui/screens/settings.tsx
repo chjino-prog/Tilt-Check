@@ -5,7 +5,7 @@ import { setSettings, useSettings, type Settings, type Theme } from '../../setti
 import { tilt, useTilt, useWakeLock, vibrate } from '../../sensor/tilt';
 import { go } from '../router';
 import { BrandBar, ConfirmSheet, Cta, Headline, NumInput, Seg, Sheet, Toggle, TopBar, toast } from '../components/ui';
-import { ICheck, IChevron } from '../icons';
+import { IChevron, IWarnFill } from '../icons';
 
 type NumKey = 'tol1' | 'tol2' | 'rotTol' | 'aResidTol' | 'aSensMin';
 
@@ -80,7 +80,7 @@ export function SettingsScreen() {
             <div class="t1" style={{ fontWeight: 500 }}>
               영점 보정
             </div>
-            <div class="t2">평평한 곳에서 폰을 뒤집어 두 번 재요</div>
+            <div class="t2">평평한 곳에서 두 번 재고, ▲▼ 방향까지 확인해요</div>
           </div>
           <div class="tail">
             <span class="value num" style={s.offset == null ? { color: 'var(--orange)' } : undefined}>
@@ -121,7 +121,7 @@ export function SettingsScreen() {
             <div class="t1" style={{ fontWeight: 500 }}>
               ▲▼ 방향 반대로
             </div>
-            <div class="t2">폰 윗단이 높은데 ▼ 가 보이면 켜요</div>
+            <div class="t2">영점 보정 3단계에서 저절로 정해져요</div>
           </div>
           <Toggle label="방향 반대로" on={s.flipSign} onChange={(v) => setSettings({ flipSign: v })} />
         </div>
@@ -190,19 +190,49 @@ export function SettingsScreen() {
   );
 }
 
-/** 영점 보정(반전법) : m1 측정 → 폰 180° 돌려 같은 자리 m2 → offset = (m1 + m2) / 2 */
+/**
+ * 영점 보정(반전법) : m1 측정 → 폰 180° 돌려 같은 자리 m2 → offset = (m1 + m2) / 2
+ * 3단계 : 카메라 쪽을 들어 ▲ 로 읽는지 확인 — 반대로 읽는 기기면 '▲▼ 방향 반대로'를 저절로 켠다.
+ * (아이폰은 기종 이름으로 부호를 바로잡는데, 그게 틀린 기기도 여기서 잡힌다)
+ */
 export function CalibrateScreen() {
   const s = useSettings();
   const t = useTilt();
   useWakeLock();
   const [m1, setM1] = useState<number | null>(null);
   const [m2, setM2] = useState<number | null>(null);
+  const [sawMove, setSawMove] = useState(false);
+  const [dirSign, setDirSign] = useState<1 | -1 | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
   const step = m1 == null ? 1 : m2 == null ? 2 : 3;
   const ready = t.status === 'running' && t.stable && !t.moving && t.raw != null;
+  const offset = m1 != null && m2 != null ? (m1 + m2) / 2 : null;
+  const lifted = offset != null && t.raw != null ? t.raw - offset : null;
+
+  // 2단계 : 폰을 실제로 들어 돌렸는지 (움직임이 한 번은 있어야 한다)
+  useEffect(() => {
+    if (step === 2 && !sawMove && (t.moving || (t.raw != null && m1 != null && Math.abs(t.raw - m1) > 3))) setSawMove(true);
+  }, [step, t.moving, t.raw]);
+
+  // 3단계 : 카메라 쪽을 3° 넘게 들고 멈추면 방향을 정한다
+  useEffect(() => {
+    if (step === 3 && dirSign == null && ready && lifted != null && Math.abs(lifted) >= 3) {
+      setDirSign(lifted > 0 ? 1 : -1);
+      vibrate(50);
+    }
+  }, [step, ready, lifted]);
+
+  const restart = () => {
+    setM1(null);
+    setM2(null);
+    setSawMove(false);
+    setDirSign(null);
+    tilt.reset();
+  };
 
   const take = () => {
     if (!ready) return toast(t.moving ? '움직이고 있어요. 멈춰주세요' : '아직 흔들려요. 잠시 그대로 두세요');
+    if (step === 2 && !sawMove) return toast('폰을 들어 180° 돌린 뒤 같은 자리에 대주세요');
     vibrate(50);
     if (step === 1) {
       setM1(t.raw);
@@ -210,23 +240,55 @@ export function CalibrateScreen() {
     } else setM2(t.raw);
   };
 
+  const unavailable = t.status === 'unsupported' || t.status === 'denied';
+
   if (step === 3) {
-    const offset = (m1! + m2!) / 2;
+    const big = offset != null && Math.abs(offset) > 2;
     return (
       <div class="screen">
         <TopBar title="영점 보정" backTo="/settings" />
-        <div class="result-hero" style={{ paddingTop: '40px' }}>
-          <div class="mark good">
-            <ICheck />
-          </div>
-          <h1>이 값으로 보정할게요</h1>
-          <div class="rot num">{fmtSigned(offset, 2)}°</div>
-          <p class="num">
-            첫 번째 {fmtSigned(m1, 2)}° · 두 번째 {fmtSigned(m2, 2)}°
-          </p>
+        <div class="steps">
+          <span class="on" />
+          <span class="on" />
+          <span class="on" />
         </div>
-        {Math.abs(offset) > 2 && (
+        <Headline
+          eyebrow="3/3 · 방향 확인"
+          title={
+            <>
+              카메라 쪽을
+              <br />
+              살짝 들어주세요
+            </>
+          }
+          sub="이 폰이 높은 쪽을 바르게 읽는지 확인해요"
+        />
+        {dirSign == null ? (
+          <div class="reading center" style={{ cursor: 'default' }}>
+            <div class="reading-head">
+              <span class={'status-dot ' + (t.moving ? 'moving' : 'live')}>{t.moving ? '움직임 감지' : '기다리는 중'}</span>
+              <span>3° 넘게 들고 멈춰요</span>
+            </div>
+            <div class="big num">
+              <span class="v">{lifted == null ? '—' : fmtSigned(lifted, 1)}</span>
+              <span class="deg">°</span>
+            </div>
+          </div>
+        ) : (
+          <div class={'dir-check ' + (dirSign > 0 ? 'good' : 'warn')}>
+            <div class="big num">{dirSign > 0 ? '▲' : '▼'}</div>
+            <b>{dirSign > 0 ? '방향이 맞아요' : '이 폰은 방향을 반대로 읽어요'}</b>
+            <span>{dirSign > 0 ? '카메라 쪽이 높을 때 ▲ 로 읽어요' : '보정을 적용하면 앱이 바로잡아서 ▲ 로 보여줘요'}</span>
+          </div>
+        )}
+        <div class="section mt16">
+          <div class="note num" style={{ marginTop: 0 }}>
+            영점 보정값 {fmtSigned(offset, 2)}° · 첫 번째 {fmtSigned(m1, 2)}° · 두 번째 {fmtSigned(m2, 2)}°
+          </div>
+        </div>
+        {big && (
           <div class="banner">
+            <IWarnFill />
             <div>
               <b>보정값이 커요</b>
               <span class="muted">두 번 모두 같은 자리에 댔는지, 케이스가 걸리지 않았는지 확인해주세요</span>
@@ -234,43 +296,37 @@ export function CalibrateScreen() {
           </div>
         )}
         <Cta>
-          <button
-            class="btn grey"
-            onClick={() => {
-              setM1(null);
-              setM2(null);
-              tilt.reset();
-            }}
-          >
+          <button class="btn grey" onClick={restart}>
             다시
           </button>
           <button
             class="btn"
+            disabled={dirSign == null}
             onClick={() => {
-              setSettings({ offset });
-              toast('영점 보정을 마쳤어요');
+              setSettings({ offset, flipSign: dirSign! < 0 });
+              toast(dirSign! < 0 ? '방향을 바로잡고 보정을 마쳤어요' : '영점 보정을 마쳤어요');
               go('/settings', true);
             }}
           >
-            보정 적용
+            {dirSign == null ? '카메라 쪽을 들어주세요' : '보정 적용'}
           </button>
         </Cta>
       </div>
     );
   }
 
-  const unavailable = t.status === 'unsupported' || t.status === 'denied';
   return (
     <div class="screen">
       <TopBar title="영점 보정" backTo="/settings" />
       <div class="steps">
         <span class="on" />
         <span class={step >= 2 ? 'on' : ''} />
+        <span />
       </div>
       <Headline
-        eyebrow={`${step}/2`}
+        eyebrow={`${step}/3`}
         title={step === 1 ? '평평한 곳에 폰을 대주세요' : '폰을 180° 돌려 같은 자리에 대주세요'}
-        sub={step === 1 ? '폰 긴 옆면을 대고 흔들리지 않게 잠시 기다려요' : '윗단과 아랫단이 바뀌도록 돌려서, 처음과 같은 자리에 대요'}
+        sub={step === 1 ? '폰 긴 옆면을 대고 흔들리지 않게 잠시 기다려요' : '윗단과 아랫단이 바뀌도록 들어서 돌려, 처음과 같은 자리에 대요'}
       />
       {unavailable ? (
         <div class="section">
@@ -307,8 +363,8 @@ export function CalibrateScreen() {
         </div>
       )}
       <Cta>
-        <button class="btn" disabled={!ready} onClick={take}>
-          {step === 1 ? '첫 번째 값 저장' : '두 번째 값 저장'}
+        <button class="btn" disabled={!ready || (step === 2 && !sawMove)} onClick={take}>
+          {step === 1 ? '첫 번째 값 저장' : !sawMove ? '폰을 들어 돌려주세요' : '두 번째 값 저장'}
         </button>
       </Cta>
       <ConfirmSheet

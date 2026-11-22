@@ -1,6 +1,6 @@
 // CSV 내보내기 — 작업지시서 5-4 저장 항목 순서
 import type { MeasureRecord } from '../db/store';
-import { capDirText, fmtDate } from './judge';
+import { capDirText, fmtDate, isLegacyCap } from './judge';
 import { dirName, highOfB } from './sign';
 
 export const CSV_HEADER = [
@@ -43,6 +43,7 @@ export function recordsToCsv(records: MeasureRecord[]): string {
     .sort((a, b) => a.createdAt - b.createdAt)
     .map((r) => {
       const cap = r.mode === 'cap';
+      const legacy = isLegacyCap(r); // 1.2.0 전 기록 : 높은 쪽을 몰라 비운다
       return [
         fmtDate(r.createdAt),
         r.ship,
@@ -64,11 +65,11 @@ export function recordsToCsv(records: MeasureRecord[]): string {
         cap ? n(r.rotErr) : '',
         cap ? n(r.aResid) : '',
         r.verdict,
-        r.memo ?? '',
+        legacy ? ['(1.2.0 전 계산 방식)', r.memo].filter(Boolean).join(' ') : (r.memo ?? ''),
         r.basis === 'ref' ? '현물' : '도면',
         r.faDir != null ? dirName(r.faDir) : '',
-        cap && r.measB != null ? side(r.highB ?? highOfB(r.measB, r.faDir ?? 1)) : '',
-        cap && r.normalB != null ? side(highOfB(r.normalB, r.faDir ?? 1)) : '',
+        cap && !legacy && r.measB != null ? side(r.highB ?? highOfB(r.measB, r.faDir ?? 1)) : '',
+        cap && !legacy && r.normalB != null ? side(highOfB(r.normalB, r.faDir ?? 1)) : '',
       ];
     });
   // 엑셀에서 한글이 깨지지 않도록 BOM + CRLF

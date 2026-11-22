@@ -24,7 +24,8 @@ export function BlockSheet(p: { open: boolean; block?: Block | null; onClose: ()
     setMemo(b?.memo ?? '');
   }, [p.open, p.block]);
 
-  const taN = parseNum(ta);
+  const taRaw = parseNum(ta);
+  const taN = taRaw == null ? null : Math.abs(taRaw); // 크기만 받는다
   const faRaw = parseNum(fa);
   const faN = faRaw == null ? null : Math.abs(faRaw); // 도면은 크기 + 방향, 부호는 받지 않는다
   // T.A · F.A 는 선택 — 모르면 둘 다 비우고 현물에서 잰다. 하나만 넣는 건 막는다.
@@ -66,7 +67,7 @@ export function BlockSheet(p: { open: boolean; block?: Block | null; onClose: ()
         </Field>
       </div>
       <Field label="T.A TRANSVERSE ANGLE · 선택">
-        <NumInput value={ta} onInput={setTa} placeholder="모르면 비워두세요" unit="°" />
+        <NumInput value={ta} onInput={(v) => setTa(v.replace(/[-−]/g, ''))} placeholder="모르면 비워두세요" unit="°" />
       </Field>
       <Field label="F.A FRAME ANGLE · 선택">
         <NumInput value={fa} onInput={(v) => setFa(v.replace(/[-−]/g, ''))} placeholder="모르면 비워두세요" unit="°" />
@@ -115,6 +116,7 @@ export function CapSheet(p: { open: boolean; blockId: string; cap?: Cap | null; 
 
   const dN = parseNum(delta);
   const ready = no.trim() !== '' && dN != null && dN >= 0 && dN < 90;
+  const zero = dN != null && Math.abs(dN) < 1e-9;
 
   const save = async () => {
     if (!ready) return;
@@ -123,7 +125,7 @@ export function CapSheet(p: { open: boolean; blockId: string; cap?: Cap | null; 
       blockId: p.blockId,
       no: no.trim(),
       delta: dN!,
-      dir,
+      dir: zero ? 1 : dir, // δ 0 캡은 돌아간 방향이 뜻이 없다 — 늘 선수로 둔다
       createdAt: p.cap?.createdAt ?? Date.now(),
     };
     await saveCap(c);
@@ -139,9 +141,10 @@ export function CapSheet(p: { open: boolean; blockId: string; cap?: Cap | null; 
         <TextInput value={no} onInput={setNo} placeholder="예: 1" autoFocus={!p.cap} />
       </Field>
       <Field label="δ 캡 취부각도" hint="WEB 이 FRAME 기준으로 돌아간 각도예요. 안 돌아갔으면 0">
-        <NumInput value={delta} onInput={setDelta} placeholder="0" unit="°" />
+        <NumInput value={delta} onInput={(v) => setDelta(v.replace(/[-−]/g, ''))} placeholder="0" unit="°" />
       </Field>
-      <Field label="돌아간 방향">
+      {!zero && (
+      <Field label="돌아간 방향" hint="도면에 적힌 그대로 (예: 캡 선미로 7°)">
         <Seg<Dir>
           value={dir}
           onChange={setDir}
@@ -151,6 +154,7 @@ export function CapSheet(p: { open: boolean; blockId: string; cap?: Cap | null; 
           ]}
         />
       </Field>
+      )}
       <div class="actions">
         <button class="btn grey" onClick={p.onClose}>
           닫기

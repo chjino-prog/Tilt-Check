@@ -37,19 +37,25 @@ export function capDirText(delta: number | null | undefined, dir: 1 | -1 | undef
   return dir === 1 ? '선수' : '선미';
 }
 
-/** 숫자 표시 : 소수 자릿수, −0 방지 */
+/** 숫자 표시 : 소수 자릿수, −0 방지, 빼기표는 화면 글꼴에 맞춰 '−' 하나로 */
 export function fmt(v: number | null | undefined, d: number): string {
   if (v == null || !isFinite(v)) return '—';
   const s = v.toFixed(d);
-  return /^-0\.?0*$/.test(s) ? s.slice(1) : s;
+  if (/^-0\.?0*$/.test(s)) return s.slice(1);
+  return s.startsWith('-') ? '−' + s.slice(1) : s;
 }
 
 /** 부호 붙인 숫자 (+1.2 / −0.4) */
 export function fmtSigned(v: number | null | undefined, d: number): string {
   if (v == null || !isFinite(v)) return '—';
   const s = fmt(v, d);
-  if (s.startsWith('-')) return '−' + s.slice(1);
+  if (s.startsWith('−')) return s;
   return Number(s) === 0 ? s : '+' + s;
+}
+
+/** 1.2.0 전 지주캡 기록 — F.A 방향 · 높은 쪽 없이, 예전 식(F.A 늘 선수)으로 계산된 값 */
+export function isLegacyCap(r: MeasureRecord): boolean {
+  return r.mode === 'cap' && r.faDir == null && r.highB == null;
 }
 
 export function fmtDate(t: number): string {
@@ -77,10 +83,15 @@ export function latestPerCap(records: MeasureRecord[]): Map<string, MeasureRecor
   return m;
 }
 
-/** 같은 블록에서 (캡별 최근) 회전오차 부호가 모두 같으면 → 마킹기준 · 방향 · 세팅 확인 경고 */
+/**
+ * 같은 블록에서 (캡별 최근) 회전오차가 모두 같은 쪽으로 돌았으면 → 마킹기준 · 방향 · 세팅 확인 경고
+ * 캡마다 돌아간 방향(선수/선미)이 달라도 비교되게 '선수 쪽으로 돌았으면 +' 로 바꿔 본다.
+ * (블록 세팅 · 마킹 기준이 틀어지면 캡 방향과 상관없이 모두 같은 쪽으로 돈 것처럼 나온다)
+ * 1.2.0 전 기록은 방향 계산이 달라 뺀다.
+ */
 export function sameSignWarning(records: MeasureRecord[]): { warn: boolean; sign: number; count: number } {
-  const errs = [...latestPerCap(records).values()]
-    .map((r) => r.rotErr)
+  const errs = [...latestPerCap(records.filter((r) => !isLegacyCap(r))).values()]
+    .map((r) => (r.rotErr == null ? null : r.rotErr * (r.dir ?? 1)))
     .filter((e): e is number => e != null && isFinite(e) && Math.abs(e) >= 0.005);
   if (errs.length < 2) return { warn: false, sign: 0, count: errs.length };
   const pos = errs.every((e) => e > 0);

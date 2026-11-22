@@ -1,12 +1,12 @@
 // 기록 : 블록별 목록 → 블록 기록 (경고 배너 · CSV 내보내기 · 상세/삭제)
 import { useEffect, useMemo, useState } from 'preact/hooks';
-import { bText, dirName } from '../../calc/sign';
-import { capDirText, fmt, fmtDate, fmtSigned, sameSignWarning, verdictLevel } from '../../calc/judge';
+import { bText, dirName, rotText } from '../../calc/sign';
+import { capDirText, fmt, fmtDate, fmtSigned, isLegacyCap, sameSignWarning, verdictLevel } from '../../calc/judge';
 import { canShareFile, downloadCsv, shareCsv } from '../../calc/csv';
 import { deleteRecord, getBlock, listBlocks, listRecords, listRecordsByBlock, type Block, type MeasureRecord } from '../../db/store';
 import { useSettings } from '../../settings';
 import { go } from '../router';
-import { BrandBar, ConfirmSheet, Empty, Headline, MenuRow, Seg, Sheet, TopBar, toast } from '../components/ui';
+import { BrandBar, ConfirmSheet, Cta, Empty, Headline, MenuRow, Seg, Sheet, TopBar, toast } from '../components/ui';
 import { IChevron, IDownload, IShare, ITabRecord, IWarn } from '../icons';
 import { SameSignBanner } from './block';
 
@@ -126,8 +126,9 @@ type Filter = 'all' | 'cap' | 'line';
 
 function summary(r: MeasureRecord, d: number): string {
   if (r.mode === 'cap') {
+    if (isLegacyCap(r)) return `1.2.0 전 계산 방식 · 회전오차 ${fmtSigned(r.rotErr, 2)}°`;
     if (r.rotErr == null) return `B ${bText(r.measB, r.faDir ?? 1)} · 역산 불가`;
-    return `회전오차 ${fmtSigned(r.rotErr, 2)}° · A잔차 ${fmtSigned(r.aResid, 2)}°`;
+    return `${rotText(r.rotErr, r.delta ?? 0, r.dir ?? 1)} · A잔차 ${fmtSigned(r.aResid, 2)}°`;
   }
   return `실측 ${fmt(Math.abs(r.meas ?? NaN), d)}° · 편차 ${fmtSigned(r.dev, d)}°`;
 }
@@ -159,8 +160,10 @@ export function BlockRecordsScreen(p: { blockId: string }) {
     byDay.set(k, [...(byDay.get(k) ?? []), r]);
   });
 
+  const hasCap = !!records?.some((r) => r.mode === 'cap');
+
   return (
-    <div class="screen no-cta">
+    <div class={'screen' + (hasCap ? '' : ' no-cta')}>
       <TopBar
         title={name ? `${name} 기록` : '기록'}
         backTo="/records"
@@ -215,6 +218,14 @@ export function BlockRecordsScreen(p: { blockId: string }) {
         </div>
       ))}
 
+      {hasCap && (
+        <Cta>
+          <button class="btn" onClick={() => go(`/records/${p.blockId}/report`)}>
+            보고서 만들기
+          </button>
+        </Cta>
+      )}
+
       <RecordSheet record={open} onClose={() => setOpen(null)} onDelete={() => setConfirmDel(true)} />
       <ConfirmSheet
         open={confirmDel}
@@ -258,17 +269,26 @@ function RecordSheet(p: { record: MeasureRecord | null; onClose: () => void; onD
       <p class="sub num">
         {r.ship} 호선 · {r.block} · {fmtDate(r.createdAt)} · <span class={'c-' + verdictLevel(r.verdict)}>{r.verdict}</span>
       </p>
+      {isLegacyCap(r) && (
+        <div class="banner">
+          <IWarn />
+          <div>
+            <b>1.2.0 전 계산 방식의 기록이에요</b>
+            <span class="muted">F.A 방향 · B 높은 쪽 없이 계산돼, F.A 선미 블록이면 회전오차가 크게 틀릴 수 있어요. 같은 방향 경고 계산에서는 빼요</span>
+          </div>
+        </div>
+      )}
       {r.mode === 'cap' ? (
         <>
           <div class="kv-group">
             {kv('δ (도면)', `${fmt(r.delta, 2)}° ${capDirText(r.delta, r.dir)}`.trim())}
             {kv('실제 δ', r.deltaReal == null ? '—' : fmt(r.deltaReal, 2) + '°')}
-            {kv('회전오차', f(r.rotErr))}
+            {kv('회전오차', isLegacyCap(r) ? f(r.rotErr) : `${f(r.rotErr)} · ${rotText(r.rotErr, r.delta ?? 0, r.dir ?? 1)}`)}
           </div>
           <div class="kv-group">
-            {kv('F.A', `${dirName(r.faDir ?? 1)} ${fmt(r.fa, 2)}°`)}
-            {kv('B 실측', bText(r.measB, r.faDir ?? 1))}
-            {kv('B 정상', bText(r.normalB, r.faDir ?? 1))}
+            {kv('F.A', isLegacyCap(r) ? `${fmt(r.fa, 2)}° (방향 기록 없음)` : `${dirName(r.faDir ?? 1)} ${fmt(r.fa, 2)}°`)}
+            {kv('B 실측', isLegacyCap(r) ? `${fmtSigned(r.measB, 2)}° (높은 쪽 기록 없음)` : bText(r.measB, r.faDir ?? 1))}
+            {kv('B 정상', isLegacyCap(r) ? `${fmtSigned(r.normalB, 2)}°` : bText(r.normalB, r.faDir ?? 1))}
             {kv('A 실측 / 정상', `${fmt(r.measA, 2)}° / ${fmt(r.normalA, 2)}°`)}
             {kv('A 잔차', f(r.aResid))}
           </div>

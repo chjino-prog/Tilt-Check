@@ -1412,3 +1412,378 @@ textarea.input {
   background: var(--red-weak);
   color: var(--red);
 }
+
+/* ── 방향 실수 경고 (1.3.0) ─────────────────────────────
+   파란 테두리 = 확인하고 넘어갈 것, 주황 = 이 캡은 조심, 빨강 = 틀렸으니 고칠 것 */
+
+/* 폰 머리 방향 카드 — 확인 전에는 고정을 막는다 */
+.head-card {
+  margin: 0 20px 14px;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 16px;
+  border: 2px solid var(--blue);
+  background: var(--blue-weak);
+  border-radius: 20px;
+}
+.head-card.ok {
+  border-color: transparent;
+  padding: 12px 16px;
+}
+.head-card.ok .hull-fig {
+  width: 56px;
+  height: 91px;
+}
+.hull-fig {
+  width: 86px;
+  height: 140px;
+  flex: none;
+}
+.hull-fig .hull {
+  fill: var(--card);
+  stroke: var(--blue-weak-text);
+  stroke-width: 2;
+}
+.hull-fig .hull-t {
+  font-size: 12px;
+  fill: var(--text-3);
+}
+.hull-fig .hull-t.on {
+  fill: var(--blue-weak-text);
+  font-weight: 700;
+}
+.hull-fig .phone {
+  fill: var(--text);
+}
+.hull-fig .cam {
+  fill: var(--bg);
+}
+.hull-fig .arrow {
+  fill: none;
+  stroke: var(--blue);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.head-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  word-break: keep-all;
+}
+.head-t {
+  font-size: 18px;
+  font-weight: 800;
+}
+.head-s {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-2);
+}
+.head-body .btn.small {
+  width: 100%;
+}
+
+/* 높은 쪽 : 결과 알림 · 큰 버튼 · 저장될 내용 */
+.high-wait,
+.high-now {
+  height: 52px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 800;
+}
+.high-wait {
+  border: 1.5px dashed var(--text-4);
+  color: var(--text-3);
+  font-size: 15px;
+  font-weight: 700;
+}
+.high-now {
+  background: var(--blue-weak);
+  color: var(--blue-weak-text);
+}
+.high-now.flat {
+  background: var(--bg-sub);
+  color: var(--text-2);
+}
+.high-btns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.high-btns button {
+  height: 72px;
+  border-radius: 16px;
+  border: 2px solid var(--line);
+  background: var(--card);
+  color: var(--text-2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+.high-btns button b {
+  font-size: 19px;
+  font-weight: 800;
+}
+.high-btns button span {
+  font-size: 12px;
+}
+.high-btns button.on {
+  border-color: var(--blue);
+  background: var(--blue-weak);
+  color: var(--blue-weak-text);
+}
+.save-box {
+  margin-top: 12px;
+  border-radius: 16px;
+  background: var(--text);
+  color: var(--bg);
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+}
+.save-box span {
+  font-size: 12px;
+  opacity: 0.7;
+}
+.save-box b {
+  font-size: 20px;
+  font-weight: 800;
+}
+.save-box em {
+  font-style: normal;
+  font-size: 13px;
+  opacity: 0.75;
+}
+
+/* 눈에 띄는 경고 상자 : warn(주황 테두리) / bad(빨강 꽉 참) */
+.alert {
+  margin: 0 20px 16px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  border-radius: 18px;
+  word-break: keep-all;
+}
+.alert > svg {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  margin-top: 1px;
+}
+.alert b {
+  display: block;
+  font-size: 16px;
+  font-weight: 800;
+  margin-bottom: 2px;
+}
+.alert span {
+  display: block;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.alert.warn {
+  background: var(--orange-weak);
+  border: 2px solid var(--orange);
+  color: var(--text);
+}
+.alert.warn > svg {
+  color: var(--orange);
+}
+.alert.warn span {
+  color: var(--text-2);
+}
+.alert.bad {
+  background: var(--red);
+  color: #fff;
+}
+.alert.bad > svg {
+  color: #fff;
+}
+.alert.bad span,
+.alert.bad .muted {
+  color: rgba(255, 255, 255, 0.88);
+}
+.alert .btn.small {
+  width: 100%;
+}
+.btn.dark {
+  background: var(--text);
+  color: var(--bg);
+}
+.two-out {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.two-out > div {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+.two-out > div.on {
+  border: 2px solid var(--text);
+}
+.two-out span {
+  font-size: 12px;
+  color: var(--text-2);
+}
+.two-out b {
+  margin: 0;
+  font-size: 17px;
+  color: var(--text-3);
+}
+
+/* 결과 : 방향 의심으로 판정 보류 */
+.alert-hero {
+  margin: 8px 20px 0;
+  background: var(--red);
+  color: #fff;
+  border-radius: 22px;
+  padding: 22px 20px;
+  word-break: keep-all;
+}
+.alert-hero svg {
+  width: 36px;
+  height: 36px;
+}
+.alert-hero h1 {
+  margin: 8px 0 0;
+  font-size: 22px;
+  line-height: 1.35;
+  font-weight: 800;
+}
+.alert-hero p {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.88);
+}
+.dir-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.dir-card .muted {
+  font-size: 12px;
+  color: var(--text-3);
+  margin-bottom: 6px;
+}
+.dir-card em {
+  font-style: normal;
+  font-weight: 700;
+  margin-left: 4px;
+}
+
+/* 현물 F.A 방향 카드 */
+.fa-dir-card {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 16px;
+  margin-bottom: 14px;
+  border: 2px solid var(--blue);
+  background: var(--blue-weak);
+  border-radius: 20px;
+}
+.fa-dir-card svg {
+  width: 96px;
+  height: 96px;
+  flex: none;
+}
+.fa-dir-card .t {
+  font-size: 12px;
+  fill: var(--text-2);
+}
+.fa-dir-card .t.on {
+  fill: var(--blue-weak-text);
+  font-weight: 700;
+}
+.fa-dir-card .line {
+  stroke: var(--text);
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+.fa-dir-card .base {
+  stroke: var(--text-4);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 4;
+}
+.fa-dir-card .arrow {
+  fill: none;
+  stroke: var(--blue);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.fa-dir-card > div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.fa-dir-card span {
+  font-size: 13px;
+  color: var(--text-2);
+}
+.fa-dir-card b {
+  font-size: 17px;
+  font-weight: 800;
+}
+.fa-dir-card i {
+  height: 1px;
+  background: var(--line);
+  margin: 10px 0;
+}
+.fa-dir-card strong {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--blue-weak-text);
+}
+
+/* 영점 보정 3단계 : ▲▼ 방향 확인 */
+.dir-check {
+  margin: 0 20px;
+  border-radius: 20px;
+  padding: 20px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.dir-check.good {
+  background: var(--green-weak);
+  border: 2px solid var(--green);
+}
+.dir-check.warn {
+  background: var(--orange-weak);
+  border: 2px solid var(--orange);
+}
+.dir-check .big {
+  font-size: 52px;
+  font-weight: 800;
+  line-height: 1;
+}
+.dir-check.good .big {
+  color: var(--green);
+}
+.dir-check.warn .big {
+  color: var(--orange);
+}
+.dir-check b {
+  font-size: 17px;
+}
+.dir-check span {
+  font-size: 13px;
+  color: var(--text-2);
+}
