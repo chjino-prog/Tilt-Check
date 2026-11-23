@@ -3,7 +3,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { blockAnglesLookRight } from '../../calc/angle';
 import { effectiveAngles, hasDesign, hasRef, type Basis } from '../../calc/basis';
 import { capDirText, fmt, fmtDate, isLegacyCap, latestPerCap, sameSignWarning, verdictLevel } from '../../calc/judge';
-import { dirName, rotText } from '../../calc/sign';
+import { leanText, rotText } from '../../calc/sign';
 import { deleteBlock, duplicateBlock, getBlock, listCaps, listRecordsByBlock, saveBlock, type Block, type Cap, type MeasureRecord } from '../../db/store';
 import { go } from '../router';
 import { ConfirmSheet, Cta, Headline, MenuRow, Seg, Sheet, TopBar, toast } from '../components/ui';
@@ -65,7 +65,7 @@ export function BlockScreen(p: { id: string }) {
     setBlock(nb);
   };
   const goRef = () => go(`/block/${block.id}/ref`);
-  const faName = eff ? (eff.faDirSet ? `FRAME ANGLE · ${dirName(eff.faDir)}` : 'FRAME ANGLE · 방향 미정') : '';
+  const faName = eff ? (eff.faDirSet ? `FRAME ANGLE · ${leanText(eff.faDir)}` : 'FRAME ANGLE · 누운 쪽 미정') : '';
   /** 지금 기준 값 + 아래에 다른 쪽 값 */
   const angleRow = (key: string, name: string, v: number, other: number | null, otherName: string) => (
     <div class="angle-row">
@@ -93,7 +93,7 @@ export function BlockScreen(p: { id: string }) {
         {eff == null ? (
           <div class="card card-empty">
             <div class="t">T.A · F.A 를 현물에서 재요</div>
-            <div class="s">CAMBER · SHEER 없는 DECK 상면 두 곳에 폰을 대면 돼요</div>
+            <div class="s">FRAME 수평선과 FRAME 웹 두 곳에 폰을 대면 돼요</div>
             <button class="btn small" onClick={goRef}>
               현물에서 재기
             </button>

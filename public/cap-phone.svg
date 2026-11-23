@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 612" role="img">
+<style>text{font-family:Pretendard,"Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif}.ts{font-size:12px;fill:#5F5E5A}.th{font-size:14px;font-weight:600;fill:#2C2C2A}.leader{stroke:#9C9A92;stroke-width:.7;stroke-dasharray:3 3;fill:none}.c-blue>rect{fill:#E6F1FB;stroke:#185FA5}.c-blue>text{fill:#0C447C}.c-coral>rect{fill:#FAECE7;stroke:#993C1D}.c-coral>text{fill:#712B13}</style>
+<rect width="680" height="612" rx="16" fill="#FFFFFF"/>
+<title>지주캡에 폰 대는 법 (입체)</title>
+<desc>위 왼쪽 A : 폰을 긴 옆면이 주판에 닿게 세워 뒷면을 WEB 에 기대고, 긴 축이 WEB 과 평행. FRAME 선을 따라 대면 틀림. 위 오른쪽 B : 폰을 긴 옆면이 주판에 닿게 세워 뒷면을 가운데 브라켓에 기대고, 긴 축이 WEB 과 직각, 카메라 쪽 머리를 선수로. 아래 왼쪽 : 폰 긴 축을 위아래로 세워 WEB 면에 대면 틀림. 아래 오른쪽 : 세운 폰을 권장, 눕힌 폰은 뒷면이 평평할 때만.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<g class="c-blue"><rect x="40" y="20" width="108" height="26" rx="6" stroke-width="0.5"/><text class="th" x="94" y="33" text-anchor="middle" dominant-baseline="central">A · T/A 방향</text></g>
+<text class="ts" x="156.0" y="38.0">주판 위 · WEB 과 평행</text>
+<g class="c-coral"><rect x="352" y="20" width="108" height="26" rx="6" stroke-width="0.5"/><text class="th" x="406" y="33" text-anchor="middle" dominant-baseline="central">B · F/A 방향</text></g>
+<text class="ts" x="468.0" y="38.0">주판 위 · 브라켓과 평행</text>
+<polygon points="133.0,150.0 294.9,243.5 206.6,294.5 44.7,201.0" fill="#ECEFF3" stroke="#55606E" stroke-width="0.8" stroke-linejoin="round"/>
+<polygon points="44.7,207.8 206.6,301.3 206.6,294.5 44.7,201.0" fill="#C9D0DA" stroke="#55606E" stroke-width="0.8" stroke-linejoin="round"/>
+<polygon points="294.9,250.3 206.6,301.3 206.6,294.5 294.9,243.5" fill="#B7C0CD" stroke="#55606E" stroke-width="0.8" stroke-linejoin="round"/>
+<polygon points="119.7,64.2 281.7,157.6 278.0,159.8 116.1,66.3" fill="#E6EAF0" stroke="#55606E" stroke-width="0.8" stroke-linejoin="round"/>
+<polygon points="116.1,159.8 278.0,253.3 278.0,159.8 116.1,66.3" fill="#C9D2DE" stroke="#55606E" stroke-width="0.8" stroke-linejoin="round"/>
+<polygon points="281.7,251.1 278.0,253.3 278.0,159.8 281.7,157.6" fill="#AEB8C6" stroke="#55606E" stroke-width="0.8" stroke-linejoin="round"/>
+<line x1="199.4" y1="208.6" x2="260.8" y2="263.2" stroke="#E24B4A" stroke-width="1.6" stroke-dasharray="6 4"/>
+<polygon points="194.8,145.8 199.3,148.3 157.3,232.0 152.9,229.5" fill="#DCE2E9" stroke="#55606E" stroke-width="0.8" stroke-linejoin="round"/>
+<polygon points="199.3,207.8 199.3,148.3 157.3,232.0" fill="#B4BFCD" stroke="#55606E" stroke-width="0.8" stroke-linejoin="round"/>
+<polygon points="120.1,133.6 171.6,163.4 168.0,165.5 116.4,135.8" fill="#4A4F58" stroke="#15171A" stroke-width="0.8" stroke-linejoin="round"/>
+<polygon points="116.4,164.7 168.0,194.4 168.0,165.5 116.4,135.8" fill="#2F3238" stroke="#15171A" stroke-width="0.8" stroke-linejoin="round"/>
+<polygon points="171.6,192.3 168.0,194.4 168.0,165.5 171.6,163.4" fill="#202328" stroke="#15171A" stroke-width="0.8" stroke-linejoin="round"/>
+<polygon points="119.0,163.6 165.4,190.4 165.4,166.6 119.0,139.8" fill="#3B82C4" stroke="none" stroke-width="0.8" stroke-linejoin="round"/>
+<circle cx="162.8" cy="177.0" r="2" fill="#0D0F12"/>
+<line x1="102.1" y1="172.9" x2="153.6" y2="202.7" stroke="#378ADD" stroke-width="2.2" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+<text class="th" x="44.0" y="112.0">세운 폰</text>
+<line class="leader" x1="96.0" y1="108.0" x2="134.1" y2="156.2"/>
+<circle cx="134.1" cy="156.2" r="2" fill="#9C9A92"/>
+<text class="ts" x="68.0" y="76.0">WEB</text>
+<line class="leader" x1="100.0" y1="72.0" x2="122.0" y2="78.2"/>
+<circle cx="122.0" cy="78.2" r="2" fill="#9C9A92"/>
+<text class="ts" x="198.0" y="92.0">브라켓</text>
+<line class="leader" x1="214.0" y1="96.0" x2="197.0" y2="147.0"/>
+<circle cx="197.0" cy="147.0" r="2" fill="#9C9A92"/>
+<text class="ts" x="44.0" y="252.0">주판</text>
+<line class="leader" x1="60.0" y1="242.0" x2="81.5" y2="205.2"/>
+<circle cx="81.5" cy="205.2" r="2" fill="#9C9A92"/>
+<text class="ts" x="170.0" y="326.0">FRAME 선 — 따라 재면 ✕</text>
+<line class="leader" x1="232.0" y1="314.0" x2="231.8" y2="237.4"/>
+<circle cx="231.8" cy="237.4" r="2" fill="#9C9A92"/>
+<polygon points="445.0,150.0 606.9,243.5 518.6,294.5 356.7,201.0" fill="#ECEFF3" stroke="#55606E" stroke-width="0.8" stroke-linejoin="round"/>
+<polygon points="356.7,207.8 518.6,301.3 518.6,294.5 356.7,201.0" fill="#C9D0DA" stroke="#55606E" stroke-width="0.8" stroke-linejoin="round"/>
+<polygon points="606.9,250.3 518.6,301.3 518.6,294.5 606.9,243.5" fill="#B7C0CD" stroke="#55606E" stroke-width="0.8" stroke-linejoin="round"/>
+<polygon points="431.7,64.2 593.7,157.6 590.0,159.8 428.1,66.3" fill="#E6EAF0" stroke="#55606E" stroke-width="0.8" stroke-linejoin="round"/>
+<polygon points="428.1,159.8 590.0,253.3 590.0,159.8 428.1,66.3" fill="#C9D2DE" stroke="#55606E" stroke-width="0.8" stroke-linejoin="round"/>
+<polygon points="593.7,251.1 590.0,253.3 590.0,159.8 593.7,157.6" fill="#AEB8C6" stroke="#55606E" stroke-width="0.8" stroke-linejoin="round"/>
+<polygon points="506.8,145.8 511.3,148.3 469.3,232.0 464.9,229.5" fill="#DCE2E9" stroke="#55606E" stroke-width="0.8" stroke-linejoin="round"/>
+<polygon points="511.3,207.8 511.3,148.3 469.3,232.0" fill="#B4BFCD" stroke="#55606E" stroke-width="0.8" stroke-linejoin="round"/>
+<polygon points="506.5,182.1 510.1,184.2 458.6,214.0 454.9,211.8" fill="#4A4F58" stroke="#15171A" stroke-width="0.8" stroke-linejoin="round"/>
+<polygon points="454.9,240.7 458.6,242.9 458.6,214.0 454.9,211.8" fill="#202328" stroke="#15171A" stroke-width="0.8" stroke-linejoin="round"/>
+<polygon points="510.1,213.1 458.6,242.9 458.6,214.0 510.1,184.2" fill="#2F3238" stroke="#15171A" stroke-width="0.8" stroke-linejoin="round"/>
+<polygon points="507.6,212.0 461.2,238.8 461.2,215.0 507.6,188.2" fill="#3B82C4" stroke="none" stroke-width="0.8" stroke-linejoin="round"/>
+<circle cx="505.0" cy="201.6" r="2" fill="#0D0F12"/>
+<line x1="521.6" y1="219.7" x2="470.0" y2="249.4" stroke="#D85A30" stroke-width="2.2" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+<text class="ts" x="470.0" y="326.0">세운 폰 · 카메라 쪽 → 선수</text>
+<line class="leader" x1="486.0" y1="314.0" x2="473.3" y2="219.9"/>
+<circle cx="473.3" cy="219.9" r="2" fill="#9C9A92"/>
+<line x1="572.0" y1="112.0" x2="606.6" y2="92.0" stroke="#73726C" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text class="ts" x="612.6" y="96.0">선수</text>
+<text class="th" x="185.0" y="372.0" text-anchor="middle">✕ 긴 축을 위아래로 세우기</text>
+<polygon points="150.0,467.0 260.4,530.8 208.9,560.5 98.5,496.8" fill="#ECEFF3" stroke="#55606E" stroke-width="0.8" stroke-linejoin="round"/>
+<polygon points="98.5,501.9 208.9,565.6 208.9,560.5 98.5,496.8" fill="#C9D0DA" stroke="#55606E" stroke-width="0.8" stroke-linejoin="round"/>
+<polygon points="260.4,535.9 208.9,565.6 208.9,560.5 260.4,530.8" fill="#B7C0CD" stroke="#55606E" stroke-width="0.8" stroke-linejoin="round"/>
+<polygon points="141.2,391.4 251.6,455.1 247.9,457.2 137.5,393.5" fill="#E6EAF0" stroke="#55606E" stroke-width="0.8" stroke-linejoin="round"/>
+<polygon points="137.5,474.2 247.9,538.0 247.9,457.2 137.5,393.5" fill="#C9D2DE" stroke="#55606E" stroke-width="0.8" stroke-linejoin="round"/>
+<polygon points="251.6,535.9 247.9,538.0 247.9,457.2 251.6,455.1" fill="#AEB8C6" stroke="#55606E" stroke-width="0.8" stroke-linejoin="round"/>
+<polygon points="177.6,438.3 202.6,452.8 199.0,454.9 173.9,440.4" fill="#4A4F58" stroke="#15171A" stroke-width="0.8" stroke-linejoin="round"/>
+<polygon points="173.9,499.9 199.0,514.4 199.0,454.9 173.9,440.4" fill="#2F3238" stroke="#15171A" stroke-width="0.8" stroke-linejoin="round"/>
+<polygon points="202.6,512.3 199.0,514.4 199.0,454.9 202.6,452.8" fill="#202328" stroke="#15171A" stroke-width="0.8" stroke-linejoin="round"/>
+<polygon points="176.1,498.7 196.7,510.6 196.7,456.2 176.1,444.3" fill="#3B82C4" stroke="none" stroke-width="0.8" stroke-linejoin="round"/>
+<circle cx="186.4" cy="453.6" r="2" fill="#0D0F12"/>
+<g stroke="#E24B4A" stroke-width="3" stroke-linecap="round"><line x1="175.4" y1="466.4" x2="197.4" y2="488.4"/><line x1="197.4" y1="466.4" x2="175.4" y2="488.4"/></g>
+<text class="ts" x="185.0" y="594.0" text-anchor="middle">WEB 판 위 선 하나 — 대는 방향마다 값이 달라요</text>
+<text class="th" x="500.0" y="372.0" text-anchor="middle">폰 자세</text>
+<polygon points="412.4,458.6 477.2,496.1 452.2,510.5 387.4,473.1" fill="#ECEFF3" stroke="#55606E" stroke-width="0.8" stroke-linejoin="round"/>
+<polygon points="387.4,476.5 452.2,513.9 452.2,510.5 387.4,473.1" fill="#C9D0DA" stroke="#55606E" stroke-width="0.8" stroke-linejoin="round"/>
+<polygon points="477.2,499.4 452.2,513.9 452.2,510.5 477.2,496.1" fill="#B7C0CD" stroke="#55606E" stroke-width="0.8" stroke-linejoin="round"/>
+<polygon points="408.0,439.1 459.5,468.9 455.8,471.0 404.3,441.2" fill="#4A4F58" stroke="#15171A" stroke-width="0.8" stroke-linejoin="round"/>
+<polygon points="404.3,470.1 455.8,499.9 455.8,471.0 404.3,441.2" fill="#2F3238" stroke="#15171A" stroke-width="0.8" stroke-linejoin="round"/>
+<polygon points="459.5,497.8 455.8,499.9 455.8,471.0 459.5,468.9" fill="#202328" stroke="#15171A" stroke-width="0.8" stroke-linejoin="round"/>
+<polygon points="406.9,469.1 453.3,495.8 453.3,472.0 406.9,445.3" fill="#3B82C4" stroke="none" stroke-width="0.8" stroke-linejoin="round"/>
+<circle cx="450.7" cy="482.4" r="2" fill="#0D0F12"/>
+<polygon points="557.5,453.2 622.3,490.6 585.5,511.9 520.7,474.4" fill="#ECEFF3" stroke="#55606E" stroke-width="0.8" stroke-linejoin="round"/>
+<polygon points="520.7,477.8 585.5,515.2 585.5,511.9 520.7,474.4" fill="#C9D0DA" stroke="#55606E" stroke-width="0.8" stroke-linejoin="round"/>
+<polygon points="622.3,494.0 585.5,515.2 585.5,511.9 622.3,490.6" fill="#B7C0CD" stroke="#55606E" stroke-width="0.8" stroke-linejoin="round"/>
+<polygon points="557.5,455.8 609.0,485.5 584.0,499.9 532.5,470.2" fill="#2F3238" stroke="#15171A" stroke-width="0.8" stroke-linejoin="round"/>
+<polygon points="532.5,474.4 584.0,504.2 584.0,499.9 532.5,470.2" fill="#202328" stroke="#15171A" stroke-width="0.8" stroke-linejoin="round"/>
+<polygon points="609.0,489.8 584.0,504.2 584.0,499.9 609.0,485.5" fill="#202328" stroke="#15171A" stroke-width="0.8" stroke-linejoin="round"/>
+<polygon points="557.9,458.5 604.2,485.3 583.6,497.2 537.3,470.4" fill="#3B82C4" stroke="none" stroke-width="0.8" stroke-linejoin="round"/>
+<circle cx="591.4" cy="489.8" r="2" fill="#0D0F12"/>
+<text class="th" x="432.0" y="534.0" text-anchor="middle">세운 폰 — 권장</text>
+<text class="ts" x="432.0" y="552.0" text-anchor="middle">긴 옆면이 주판에</text>
+<text class="th" x="574.0" y="534.0" text-anchor="middle">눕힌 폰 — 주의</text>
+<text class="ts" x="574.0" y="552.0" text-anchor="middle">뒷면이 평평할 때만</text>
+<text class="ts" x="503.0" y="576.0" text-anchor="middle">화면 속 검은 점 = 카메라 쪽(폰 머리)</text>
+<text class="ts" x="503.0" y="594.0" text-anchor="middle">어느 자세든 긴 축은 선 방향으로</text>
+</svg>

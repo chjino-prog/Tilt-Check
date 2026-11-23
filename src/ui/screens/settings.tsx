@@ -3,7 +3,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { fmtSigned, parseNum } from '../../calc/judge';
 import { setSettings, useSettings, type Settings, type Theme } from '../../settings';
 import { tilt, useTilt, useWakeLock, vibrate } from '../../sensor/tilt';
-import { go } from '../router';
+import { back, go } from '../router';
 import { BrandBar, ConfirmSheet, Cta, Headline, NumInput, Seg, Sheet, Toggle, TopBar, toast } from '../components/ui';
 import { IChevron, IWarnFill } from '../icons';
 
@@ -85,6 +85,22 @@ export function SettingsScreen() {
           <div class="tail">
             <span class="value num" style={s.offset == null ? { color: 'var(--orange)' } : undefined}>
               {s.offset == null ? '안 함' : fmtSigned(s.offset, 2) + '°'}
+            </span>
+            <span class="chev">
+              <IChevron />
+            </span>
+          </div>
+        </button>
+        <button class="row compact" onClick={() => go('/settings/calibrate-face')}>
+          <div class="body">
+            <div class="t1" style={{ fontWeight: 500 }}>
+              뒷면 보정
+            </div>
+            <div class="t2">FRAME 웹에 폰 뒷면을 붙여 잴 때 써요</div>
+          </div>
+          <div class="tail">
+            <span class="value num" style={s.faceBias == null ? { color: 'var(--orange)' } : undefined}>
+              {s.faceBias == null ? '안 함' : fmtSigned(faceBiasDeg(s.faceBias), 2) + '°'}
             </span>
             <span class="chev">
               <IChevron />
@@ -379,6 +395,148 @@ export function CalibrateScreen() {
           toast('보정값을 지웠어요');
         }}
       />
+    </div>
+  );
+}
+
+/** 뒷면 보정값(비율) → 각도로 본 크기 (°) */
+export const faceBiasDeg = (b: number) => (Math.asin(Math.max(-1, Math.min(1, b))) * 180) / Math.PI;
+
+/**
+ * 뒷면 보정 : 화면 축 센서의 치우침을 잡는다 (판 기울기 재기용).
+ * 1) 책상에 화면이 위로 → 2) 엎어서 화면이 아래로. 두 값의 가운데가 치우침이고,
+ * 1) 이 2) 보다 커야 '화면이 하늘 = +' 다 (아니면 부호를 뒤집어 저장).
+ */
+export function FaceCalibrateScreen() {
+  const t = useTilt();
+  useWakeLock();
+  const [up, setUp] = useState<number | null>(null);
+  const [down, setDown] = useState<number | null>(null);
+  const step = up == null ? 1 : down == null ? 2 : 3;
+  const r = t.faceRaw;
+  // 책상에 놓였는지 : 화면 축이 거의 중력 방향
+  const flat = r != null && Math.abs(r) > 0.97;
+  const flipped = r != null && up != null && Math.sign(r) !== Math.sign(up);
+  const ready = t.status === 'running' && t.faceStable && !t.moving && flat && (step !== 2 || flipped);
+  const unavailable = t.status === 'unsupported' || t.status === 'denied';
+
+  const take = () => {
+    if (!ready) {
+      if (t.moving) return toast('움직이고 있어요. 멈춰주세요');
+      if (!flat) return toast('책상 위에 평평하게 놓아주세요');
+      if (step === 2 && !flipped) return toast('폰을 엎어서 화면이 아래로 가게 놓아주세요');
+      return toast('아직 흔들려요. 잠시 그대로 두세요');
+    }
+    vibrate(50);
+    if (step === 1) {
+      setUp(r);
+      tilt.reset();
+    } else setDown(r);
+  };
+
+  if (step === 3) {
+    const bias = (up! + down!) / 2;
+    const sign: 1 | -1 = up! > down! ? 1 : -1;
+    const big = Math.abs(faceBiasDeg(bias)) > 2;
+    return (
+      <div class="screen">
+        <TopBar title="뒷면 보정" backTo="/settings" />
+        <div class="steps">
+          <span class="on" />
+          <span class="on" />
+        </div>
+        <Headline eyebrow="완료" title="뒷면 보정값을 구했어요" sub="FRAME 웹에 폰 뒷면을 붙여 잴 때 이 값만큼 바로잡아요" />
+        <div class="section">
+          <div class="card">
+            <div class="kv">
+              <span class="k">보정값</span>
+              <span class="v num">{fmtSigned(faceBiasDeg(bias), 2)}°</span>
+            </div>
+            <div class="kv">
+              <span class="k">화면 방향</span>
+              <span class="v">{sign > 0 ? '바르게 읽어요' : '반대로 읽어 바로잡아요'}</span>
+            </div>
+          </div>
+        </div>
+        {big && (
+          <div class="banner">
+            <IWarnFill />
+            <div>
+              <b>보정값이 커요</b>
+              <span class="muted">두 번 모두 같은 자리 · 평평한 곳이었는지, 케이스가 걸리지 않았는지 확인해주세요</span>
+            </div>
+          </div>
+        )}
+        <Cta>
+          <button
+            class="btn grey"
+            onClick={() => {
+              setUp(null);
+              setDown(null);
+              tilt.reset();
+            }}
+          >
+            다시
+          </button>
+          <button
+            class="btn"
+            onClick={() => {
+              setSettings({ faceBias: bias, faceSign: sign });
+              toast('뒷면 보정을 마쳤어요');
+              back('/settings');
+            }}
+          >
+            보정 적용
+          </button>
+        </Cta>
+      </div>
+    );
+  }
+
+  return (
+    <div class="screen">
+      <TopBar title="뒷면 보정" backTo="/settings" />
+      <div class="steps">
+        <span class="on" />
+        <span class={step >= 2 ? 'on' : ''} />
+      </div>
+      <Headline
+        eyebrow={`${step}/2`}
+        title={step === 1 ? '책상에 화면이 위로 가게 놓아주세요' : '같은 자리에 엎어서 놓아주세요'}
+        sub={step === 1 ? '케이스를 끼운 그대로, 평평한 곳에 놓고 기다려요' : '화면이 바닥을 보게 뒤집어요'}
+      />
+      {unavailable ? (
+        <div class="section">
+          <div class="card note" style={{ marginTop: 0 }}>
+            이 기기에서는 기울기 센서를 쓸 수 없어요.
+          </div>
+        </div>
+      ) : t.status === 'need-permission' ? (
+        <div class="reading center" style={{ padding: '28px 20px', cursor: 'default' }}>
+          <div style={{ fontSize: '17px', fontWeight: 700 }}>기울기 센서를 켜주세요</div>
+          <button class="btn small mt16" onClick={() => tilt.requestPermission()}>
+            센서 켜기
+          </button>
+        </div>
+      ) : (
+        <div class={'reading' + (ready ? ' stable' : '')} onClick={take} role="button">
+          <div class="reading-head">
+            <span class={'status-dot ' + (t.moving ? 'moving' : ready ? 'stable' : 'live')}>{t.moving ? '움직임 감지' : ready ? '안정' : flat ? '측정 중' : '평평하게 놓아주세요'}</span>
+            <span>{r == null ? '' : r > 0 ? '화면이 위' : '화면이 아래'}</span>
+          </div>
+          <div class="big num">
+            <span class="arrow" />
+            <span class={'v' + (r == null ? ' idle' : '')}>{r == null ? '—' : Math.abs(faceBiasDeg(r)).toFixed(1)}</span>
+            <span class="deg">°</span>
+          </div>
+          <div class="reading-hint">안정되면 버튼이나 화면을 눌러 저장해요</div>
+        </div>
+      )}
+      <Cta>
+        <button class="btn" disabled={!ready} onClick={take}>
+          {step === 1 ? '첫 번째 값 저장' : '두 번째 값 저장'}
+        </button>
+      </Cta>
     </div>
   );
 }

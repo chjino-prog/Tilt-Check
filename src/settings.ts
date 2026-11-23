@@ -14,6 +14,8 @@ export interface Settings {
   flipSign: boolean; // ▲▼ 방향 반대로 (기기 센서 부호가 다를 때 — 영점 보정 3단계에서 저절로 정함)
   theme: Theme;
   offset: number | null; // 영점 보정값 (°)
+  faceBias: number | null; // 뒷면 보정 : 화면 축 센서 치우침 (중력 1 기준). 판 기울기 재기에 쓴다
+  faceSign: 1 | -1; // 화면이 하늘을 볼 때 + 가 되게 하는 부호 (뒷면 보정에서 저절로 정함)
 }
 
 export const DEFAULTS: Settings = {
@@ -27,6 +29,8 @@ export const DEFAULTS: Settings = {
   flipSign: false,
   theme: 'system',
   offset: null,
+  faceBias: null,
+  faceSign: 1,
 };
 
 const KEY = 'tiltcheck.settings.v1';

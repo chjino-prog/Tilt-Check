@@ -76,6 +76,27 @@ export function analyzeCapDir(ta: number, fa: number, faDir: Dir, delta: number,
   return analyzeCap(ta, fa, delta, calcDir(capDirOf(delta, capDir), faDir), measA, measB);
 }
 
+/**
+ * 3) FRAME 누운 쪽 — 현장에서 눈으로 보이는 말.
+ *    F.A 방향 = FRAME 이 누운 쪽 = LONGL. 라인의 낮은 끝 (FRAME 과 LONGL. 은 직각이라 늘 같다).
+ *    → LONGL. 라인 높은 쪽 = 누운 쪽의 반대.
+ */
+export const longlHighOfLean = (lean: Dir): Dir => -lean as Dir;
+export const leanOfLonglHigh = (high: Dir): Dir => -high as Dir;
+
+/** F.A 방향을 글로 : '선미로 누움' */
+export const leanText = (faDir: Dir) => `${dirName(faDir)}로 누움`;
+
+/**
+ * 판 기울기 재기 (폰 뒷면을 FRAME 웹에 붙임) → FRAME 누운 쪽.
+ * face : 화면이 하늘 쪽이면 + (판 기울기 크기), facing : 사람이 바라보는 쪽 (선수 +1).
+ * 폰 화면은 사람을 보므로, 화면이 하늘을 보면 웹 윗부분이 사람 반대쪽(바라보는 쪽)으로 누운 것이다.
+ */
+export function leanFromFace(face: number, facing: Dir): Dir | null {
+  if (!isFinite(face) || Math.abs(face) < 0.005) return null;
+  return face > 0 ? facing : (-facing as Dir);
+}
+
 /** 정상값 비교 등에서 쓰는 허용 한계 (허용 회전오차가 없으면 2°) */
 export const rotLimit = (tol: number | null | undefined) => Math.max(tol ?? 2, 1);
 

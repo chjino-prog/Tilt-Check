@@ -11,7 +11,7 @@ import { LineScreen } from './ui/screens/line';
 import { RefScreen } from './ui/screens/ref';
 import { ReportScreen } from './ui/screens/report';
 import { BlockRecordsScreen, RecordsScreen } from './ui/screens/records';
-import { CalibrateScreen, SettingsScreen } from './ui/screens/settings';
+import { CalibrateScreen, FaceCalibrateScreen, SettingsScreen } from './ui/screens/settings';
 
 function useTheme() {
   const { theme } = useSettings();
@@ -65,6 +65,7 @@ export function App() {
     screen = <SettingsScreen />;
     tab = true;
   } else if (path === '/settings/calibrate') screen = <CalibrateScreen />;
+  else if (path === '/settings/calibrate-face') screen = <FaceCalibrateScreen />;
   else if ((m = match('/block/:id', path))) screen = <BlockScreen key={m.id} id={m.id} />;
   else if ((m = match('/block/:id/cap/:cap', path))) screen = <CapScreen key={m.cap} blockId={m.id} capId={m.cap} />;
   else if ((m = match('/block/:id/line', path))) screen = <LineScreen key={m.id} blockId={m.id} />;

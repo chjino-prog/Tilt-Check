@@ -1,7 +1,7 @@
 // 지주캡 계측 보고서 — A4 한 장(결재용). 화면에서는 폭에 맞춰 줄여 보여 주고, 인쇄 · PDF 저장은 인쇄 창으로.
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { BASIS_DIFF_OK, buildReport, hhmm, reportFileName, shortDate, spanText, type Report, type ReportRow } from '../../calc/report';
-import { dirName } from '../../calc/sign';
+import { dirName, leanText } from '../../calc/sign';
 import { fmt } from '../../calc/judge';
 import { getBlock, listCaps, listRecordsByBlock } from '../../db/store';
 import { useSettings } from '../../settings';
@@ -236,11 +236,11 @@ function ReportSheet(p: { rep: Report; printedAt: number; zoom: number; onOverfl
             <td class="lab fa">F.A</td>
             <td class={used === 'design' ? 'used' : ''}>
               <span class="num-b">{r.design ? fmt(r.design.fa, 2) + '°' : '—'}</span>
-              {r.design && <small>{r.design.faDir ? dirName(r.design.faDir) : '방향 없음'}</small>}
+              {r.design && <small>{r.design.faDir ? leanText(r.design.faDir) : '방향 없음'}</small>}
             </td>
             <td class={used === 'ref' ? 'used' : ''}>
               <span class="num-b">{r.ref ? fmt(r.ref.fa, 2) + '°' : '—'}</span>
-              {r.ref && <small>{r.ref.faDir ? dirName(r.ref.faDir) : '방향 없음'}</small>}
+              {r.ref && <small>{r.ref.faDir ? leanText(r.ref.faDir) : '방향 없음'}</small>}
             </td>
             <td class="m">
               {r.faDiff == null ? '' : fmt(r.faDiff, 2) + '°'}
@@ -343,7 +343,7 @@ function Checks(p: { rep: Report }) {
   const r = p.rep;
   const lines: { kind: 'ok' | 'warn' | 'bad'; text: string }[] = [];
   const faLow = r.rows.find((x) => x.measured) && (r.basis === 'ref' ? r.ref?.faDir : r.design?.faDir);
-  const faNote = faLow ? ` (F.A ${dirName(faLow)} 블록 = ${dirName(faLow)} 끝이 낮음)` : '';
+  const faNote = faLow ? ` (F.A ${dirName(faLow)} 블록 = FRAME 이 ${leanText(faLow)})` : '';
   if (r.dirWarnCaps.length) {
     lines.push({ kind: 'bad', text: `${r.dirWarnCaps.join(', ')} : 각도 A 가 반대 방향 정상값에 더 맞아요 — 캡 방향 · F.A 방향 확인 전까지 판정 보류` });
   } else if (r.aOk === true) {

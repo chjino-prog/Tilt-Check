@@ -1,7 +1,7 @@
 // 공통 화면 조각 : 상단 막대, 하단 주 버튼, 바텀시트, 토스트, 세그먼트, 토글, 입력칸
 import type { ComponentChildren, JSX } from 'preact';
-import { useEffect, useState } from 'preact/hooks';
-import { back } from '../router';
+import { useEffect, useRef, useState } from 'preact/hooks';
+import { back, registerSheet } from '../router';
 import { IBack, IMore, IWarnFill } from '../icons';
 
 export function TopBar(p: { title?: string; backTo?: string; onMore?: () => void; right?: ComponentChildren }) {
@@ -52,15 +52,19 @@ export function Cta(p: { children: ComponentChildren }) {
 }
 
 export function Sheet(p: { open: boolean; onClose: () => void; children: ComponentChildren }) {
+  // 닫기 함수는 늘 최신으로 (시트가 열려 있는 동안 부모가 다시 그려져도)
+  const closeRef = useRef(p.onClose);
+  closeRef.current = p.onClose;
   useEffect(() => {
     if (!p.open) return;
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && p.onClose();
+    const close = () => closeRef.current();
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close();
     window.addEventListener('keydown', onKey);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    // 스크롤 잠금 · 폰 뒤로가기 처리는 router 가 '열린 시트 수'로 한다
+    const unregister = registerSheet(close);
     return () => {
       window.removeEventListener('keydown', onKey);
-      document.body.style.overflow = prev;
+      unregister();
     };
   }, [p.open]);
   if (!p.open) return null;

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { Dir } from '../../calc/angle';
 import { basisName, effectiveAngles, type Effective } from '../../calc/basis';
 import { capDirText, capVerdict, fmt, fmtSigned, parseNum, verdictLevel } from '../../calc/judge';
-import { analyzeCapDir, bDevText, bText, capDirOf, capNormalDir, dirName, dirSuspect, faHighSide, flipSuspect, highOfB, highSensitive, rotText, signedA, signedB } from '../../calc/sign';
+import { analyzeCapDir, bDevText, bText, capDirOf, capNormalDir, dirName, dirSuspect, faHighSide, flipSuspect, highOfB, highSensitive, leanText, rotText, signedA, signedB } from '../../calc/sign';
 import { clearDraft, loadDraft, saveDraft, type Draft, type Reading } from '../../db/draft';
 import { deleteCap, getBlock, getCap, newId, saveBlock, saveRecord, type Block, type Cap } from '../../db/store';
 import { setSettings, useSettings } from '../../settings';
@@ -42,27 +42,39 @@ export function GuideSheet(p: { open: boolean; onClose: () => void }) {
   return (
     <Sheet open={p.open} onClose={p.onClose}>
       <h2>측정 방향</h2>
-      <p class="sub">각도기는 주판 위에, 기준 부재 밑변과 평행하게 대요</p>
+      <p class="sub">기준은 FRAME 선이 아니라 캡 자신의 WEB · 브라켓이에요. δ 가 있는 캡도 같아요</p>
+      <div class="where">
+        <div class="li ok">
+          <span>
+            <b>각도 A · WEB 방향</b> 주판 위, WEB 과 평행. 숫자만 넣어요
+          </span>
+        </div>
+        <div class="li ok">
+          <span>
+            <b>각도 B · WEB 직각</b> 주판 위, 브라켓과 평행. 폰 머리(카메라 쪽)를 선수로
+          </span>
+        </div>
+        <div class="li no">
+          <span>FRAME 선을 따라 대거나, 폰 긴 축을 위아래로 세워 WEB 면에 대면 틀려요</span>
+        </div>
+      </div>
+      <div class="guide-h mt16">폰으로 잴 때</div>
+      <a href={`${import.meta.env.BASE_URL}cap-phone.svg`} target="_blank" rel="noopener">
+        <img
+          class="guide-img"
+          src={`${import.meta.env.BASE_URL}cap-phone.svg`}
+          alt="폰 대는 법 — A 는 폰을 세워 WEB 에 기대고 긴 옆면을 주판에, B 는 가운데 브라켓에 기대고 카메라 쪽을 선수로. 긴 축을 위아래로 세우면 틀림. 세운 폰 권장, 눕힌 폰은 뒷면이 평평할 때만"
+        />
+      </a>
+      <div class="guide-h mt16">디지털 수평계로 잴 때</div>
       <a href={`${import.meta.env.BASE_URL}cap-guide.webp`} target="_blank" rel="noopener">
         <img
           class="guide-img"
           src={`${import.meta.env.BASE_URL}cap-guide.webp`}
-          alt="지주캡 측정 방향 그림 — TS 는 ④ 주판, PSA 는 ③ 주판. T/A(각도 A) 는 WEB 과 평행, F/A(각도 B) 는 브라켓과 평행"
+          alt="지주캡 측정 방향 그림 — TS 는 ④ 주판, PSA 는 ③ 주판. 각도 A 는 WEB 과 평행, 각도 B 는 브라켓과 평행"
         />
       </a>
       <div class="note center">그림을 누르면 크게 봐요</div>
-      <div class="where mt16">
-        <div class="li ok">
-          <span>
-            <b>각도 B (F/A)</b> 숫자와 함께 높은 쪽(선수/선미)을 골라요
-          </span>
-        </div>
-        <div class="li ok">
-          <span>
-            <b>각도 A (T/A)</b> 숫자만 넣어요. 어느 쪽으로 대도 돼요
-          </span>
-        </div>
-      </div>
       <div class="actions mt16">
         <button class="btn" onClick={p.onClose}>
           확인
@@ -82,14 +94,14 @@ function FaDirSheet(p: { open: boolean; block: Block; onClose: () => void; onSav
   }, [p.open]);
   return (
     <Sheet open={p.open} onClose={p.onClose}>
-      <h2>F.A 는 어느 쪽이에요?</h2>
-      <p class="sub">{ref ? '현물 기준 F.A 방향이에요. LONGL. 라인이 높은 쪽의 반대쪽이에요' : '도면에 적힌 방향 그대로 골라요 (예: F.A 선미로 3.2°)'}</p>
+      <h2>FRAME 이 어느 쪽으로 누웠어요?</h2>
+      <p class="sub">{ref ? '현물 기준 F.A 방향이에요. FRAME 이 누운 쪽 = LONGL. 라인이 낮은 쪽이에요' : '도면 F.A 방향 그대로예요 (F.A 선미로 3.2° = 선미 쪽으로 누움)'}</p>
       <Seg<Dir>
         value={d}
         onChange={setD}
         options={[
-          { v: 1, label: '선수' },
-          { v: -1, label: '선미' },
+          { v: 1, label: '선수 쪽' },
+          { v: -1, label: '선미 쪽' },
         ]}
       />
       <div class="actions mt16">
@@ -217,7 +229,7 @@ export function CapScreen(p: { blockId: string; capId: string }) {
         onSaved={(b) => {
           setFaSheet(false);
           setBlock(b);
-          toast(`F.A ${dirName(effectiveAngles(b)?.faDir ?? 1)} 쪽으로 계산해요`);
+          toast(`FRAME 이 ${dirName(effectiveAngles(b)?.faDir ?? 1)} 쪽으로 누운 것으로 계산해요`);
         }}
       />
       <CapSheet
@@ -287,11 +299,11 @@ export function CapScreen(p: { blockId: string; capId: string }) {
           <div class="banner">
             <IWarn />
             <div>
-              <b>F.A 방향(선수/선미)을 아직 안 정했어요</b>
+              <b>FRAME 이 누운 쪽(F.A 방향)을 아직 안 정했어요</b>
               <span class="muted">지금은 선수로 계산해요. 방향이 틀리면 회전오차가 크게 틀어져요</span>
               <div>
                 <button class="text-btn mt8" onClick={() => setFaSheet(true)}>
-                  F.A 방향 정하기
+                  누운 쪽 정하기
                 </button>
               </div>
             </div>
@@ -302,7 +314,7 @@ export function CapScreen(p: { blockId: string; capId: string }) {
             <BasisLine eff={eff} />
             <div class="stat-grid">
               <div class="stat">
-                <div class="k">정상 B (F/A)</div>
+                <div class="k">정상 B · WEB 직각</div>
                 <div class="v num">
                   {fmt(Math.abs(normal.thetaB), 2)}
                   <small>°</small>
@@ -310,7 +322,7 @@ export function CapScreen(p: { blockId: string; capId: string }) {
                 <div class="k">{sideText(normal.thetaB, eff.faDir)}</div>
               </div>
               <div class={'stat' + (aWeak ? ' muted' : '')}>
-                <div class="k">정상 A (T/A)</div>
+                <div class="k">정상 A · WEB 방향</div>
                 <div class="v num">
                   {fmt(Math.abs(normal.thetaA), 2)}
                   <small>°</small>
@@ -335,8 +347,8 @@ export function CapScreen(p: { blockId: string; capId: string }) {
           </button>
         </div>
         <div class="list">
-          {step('B', 'F/A 방향 · 각도 B', lines.b, rB, rB ? (rB.high ? dirName(rB.high) + ' 높음' : '수평') : undefined)}
-          {step('A', 'T/A 방향 · 각도 A', lines.a, rA)}
+          {step('B', '각도 B · WEB 직각 (브라켓 방향)', lines.b, rB, rB ? (rB.high ? dirName(rB.high) + ' 높음' : '수평') : undefined)}
+          {step('A', '각도 A · WEB 방향', lines.a, rA)}
         </div>
         <Cta>
           <button class="btn" onClick={() => setStage(next)}>
@@ -356,7 +368,7 @@ export function CapScreen(p: { blockId: string; capId: string }) {
         bar={bar}
         isB={isB}
         done={{ B: !!rB, A: !!rA }}
-        title={isB ? '주판에 F/A 방향으로 대주세요' : '주판에 T/A 방향으로 대주세요'}
+        title={isB ? '주판에 WEB 과 직각으로 대주세요' : '주판에 WEB 과 평행하게 대주세요'}
         sub={isB ? lines.b : lines.a + ' · 어느 쪽으로 대도 돼요'}
         normal={isB ? normal.thetaB : normal.thetaA}
         faDir={eff.faDir}
@@ -404,7 +416,7 @@ function BasisLine(p: { eff: Effective }) {
   return (
     <div class="basis-line num">
       <span>
-        {basisName(p.eff.basis)} 기준 · T.A {fmt(p.eff.ta, 2)}° · F.A {dirName(p.eff.faDir)} {fmt(p.eff.fa, 2)}°
+        {basisName(p.eff.basis)} 기준 · T.A {fmt(p.eff.ta, 2)}° · F.A {fmt(p.eff.fa, 2)}° {leanText(p.eff.faDir)}
       </span>
       {p.eff.basis === 'ref' && <span class="badge blue">현물</span>}
     </div>
@@ -448,7 +460,7 @@ function StepScreen(p: {
         <span class={p.isB || p.done.B ? 'on' : ''} />
         <span class={!p.isB || p.done.A ? 'on' : ''} />
       </div>
-      <Headline eyebrow={p.isB ? (m.manual ? '각도 B · 디지털 수평계' : '각도 B · F/A 방향') : '각도 A · T/A 방향'} title={title} sub={p.sub} />
+      <Headline eyebrow={p.isB ? (m.manual ? '각도 B · 디지털 수평계' : '각도 B · WEB 직각') : '각도 A · WEB 방향'} title={title} sub={p.sub} />
       <div class="section" style={{ marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span class="normal-pill num">
           정상 <b>{p.isB ? bText(p.normal, p.faDir) : fmt(Math.abs(p.normal), 2) + '°'}</b>
@@ -482,7 +494,7 @@ function StepScreen(p: {
       {p.isB && <HighPicker m={m} h={h} head={head} summary={summary} sub={dev == null ? null : bDevText(dev, p.faDir)} />}
       <Gauge dev={dev} />
       <RefNote />
-      <div class="disclaimer">폰 케이스 · 카메라 돌출부 때문에 옆면이 뜨지 않게 대주세요</div>
+      <div class="disclaimer">폰은 세워서 긴 옆면을 주판에 대요. 눕히면 카메라 돌출부 때문에 머리 쪽이 들떠요</div>
       <RefWarningSheet />
       <Cta>
         {m.fixed == null ? (
@@ -649,8 +661,8 @@ function ResultScreen(p: {
         <div class="list">
           <button class="row" onClick={p.onEditFa}>
             <div class="body">
-              <div class="t1">블록 F.A 방향</div>
-              <div class={'t2' + (faUnset ? ' c-bad' : '')}>{faUnset ? '아직 안 정함 (선수로 계산 중)' : `지금 ${dirName(eff.faDir)} · ${basisName(eff.basis)} 기준`}</div>
+              <div class="t1">블록 FRAME 누운 쪽 (F.A 방향)</div>
+              <div class={'t2' + (faUnset ? ' c-bad' : '')}>{faUnset ? '아직 안 정함 (선수로 계산 중)' : `지금 ${leanText(eff.faDir)} · ${basisName(eff.basis)} 기준`}</div>
             </div>
             <span class="chev">
               <IChevron />
@@ -676,7 +688,7 @@ function ResultScreen(p: {
             다시 재기
           </button>
           <button class="btn" onClick={faUnset ? p.onEditFa : p.onEditCap}>
-            {faUnset ? 'F.A 방향 정하기' : '캡 방향 확인하기'}
+            {faUnset ? '누운 쪽 정하기' : '캡 방향 확인하기'}
           </button>
         </Cta>
         {p.children}
@@ -784,7 +796,7 @@ function ResultScreen(p: {
             <div class="kv">
               <span class="k">계산 기준</span>
               <span class="v num">
-                {basisName(eff.basis)} · T.A {fmt(eff.ta, 2)}° · F.A {dirName(eff.faDir)} {fmt(eff.fa, 2)}°
+                {basisName(eff.basis)} · T.A {fmt(eff.ta, 2)}° · F.A {fmt(eff.fa, 2)}° {leanText(eff.faDir)}
               </span>
             </div>
           </div>

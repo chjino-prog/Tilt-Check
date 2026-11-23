@@ -1,6 +1,6 @@
 // 기록 : 블록별 목록 → 블록 기록 (경고 배너 · CSV 내보내기 · 상세/삭제)
 import { useEffect, useMemo, useState } from 'preact/hooks';
-import { bText, dirName, rotText } from '../../calc/sign';
+import { bText, dirName, leanText, rotText } from '../../calc/sign';
 import { capDirText, fmt, fmtDate, fmtSigned, isLegacyCap, sameSignWarning, verdictLevel } from '../../calc/judge';
 import { canShareFile, downloadCsv, shareCsv } from '../../calc/csv';
 import { deleteRecord, getBlock, listBlocks, listRecords, listRecordsByBlock, type Block, type MeasureRecord } from '../../db/store';
@@ -286,7 +286,7 @@ function RecordSheet(p: { record: MeasureRecord | null; onClose: () => void; onD
             {kv('회전오차', isLegacyCap(r) ? f(r.rotErr) : `${f(r.rotErr)} · ${rotText(r.rotErr, r.delta ?? 0, r.dir ?? 1)}`)}
           </div>
           <div class="kv-group">
-            {kv('F.A', isLegacyCap(r) ? `${fmt(r.fa, 2)}° (방향 기록 없음)` : `${dirName(r.faDir ?? 1)} ${fmt(r.fa, 2)}°`)}
+            {kv('F.A', isLegacyCap(r) ? `${fmt(r.fa, 2)}° (방향 기록 없음)` : `${fmt(r.fa, 2)}° · ${leanText(r.faDir ?? 1)}`)}
             {kv('B 실측', isLegacyCap(r) ? `${fmtSigned(r.measB, 2)}° (높은 쪽 기록 없음)` : bText(r.measB, r.faDir ?? 1))}
             {kv('B 정상', isLegacyCap(r) ? `${fmtSigned(r.normalB, 2)}°` : bText(r.normalB, r.faDir ?? 1))}
             {kv('A 실측 / 정상', `${fmt(r.measA, 2)}° / ${fmt(r.normalA, 2)}°`)}

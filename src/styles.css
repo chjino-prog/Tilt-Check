@@ -1094,6 +1094,13 @@ textarea.input {
   background: #fff;
   display: block;
 }
+/* 측정 방향 시트 : 그림 위 작은 제목 */
+.guide-h {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-2);
+  margin-bottom: 8px;
+}
 
 .photo-thumb {
   width: 100%;

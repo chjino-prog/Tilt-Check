@@ -73,19 +73,19 @@ export function BlockSheet(p: { open: boolean; block?: Block | null; onClose: ()
         <NumInput value={fa} onInput={(v) => setFa(v.replace(/[-−]/g, ''))} placeholder="모르면 비워두세요" unit="°" />
       </Field>
       {faN != null && (
-        <Field label="F.A 방향" hint="도면에 적힌 그대로 (예: F.A 선미로 3.2°)">
+        <Field label="F.A 방향 · FRAME 이 누운 쪽" hint="도면 'F.A 선미로 3.2°' = FRAME 이 선미 쪽으로 3.2° 누움">
           <Seg<Dir>
             value={faDir}
             onChange={setFaDir}
             options={[
-              { v: 1, label: '선수' },
-              { v: -1, label: '선미' },
+              { v: 1, label: '선수 쪽' },
+              { v: -1, label: '선미 쪽' },
             ]}
           />
         </Field>
       )}
       {half && <div class="warn-text">T.A · F.A 는 둘 다 넣거나 둘 다 비워주세요.</div>}
-      {needDir && faDir == null && <div class="warn-text">F.A 방향(선수 / 선미)을 골라주세요.</div>}
+      {needDir && faDir == null && <div class="warn-text">FRAME 이 누운 쪽(선수 / 선미)을 골라주세요.</div>}
       {odd && <div class="warn-text">보통은 0 &lt; F.A ≤ T.A &lt; 90° 예요. T.A · F.A 정의가 맞는지 확인해주세요.</div>}
       <Field label="메모 (선택)">
         <TextInput value={memo} onInput={setMemo} placeholder="위치 · 특이사항" />

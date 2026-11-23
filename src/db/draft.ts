@@ -7,6 +7,7 @@ export interface Reading {
   high?: Dir; // 높은 쪽 (B · LONGL. 라인만)
   at: number; // 잰 시각
   manual?: boolean; // 직접 입력(디지털 수평계)
+  method?: 'web' | 'line'; // 현물 F.A : FRAME 웹 판 기울기 / LONGL. 라인 (없으면 라인)
 }
 
 export interface Draft {
