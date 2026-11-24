@@ -225,6 +225,7 @@ function ReportSheet(p: { rep: Report; printedAt: number; zoom: number; onOverfl
             <td class="lab ta">T.A</td>
             <td class={used === 'design' ? 'used' : ''}>
               <span class="num-b">{r.design ? fmt(r.design.ta, 2) + '°' : '—'}</span>
+              {r.design?.slope != null && Math.abs(r.design.slope - r.design.ta) >= 0.005 && <small>경사 {fmt(r.design.slope, 2)}°</small>}
             </td>
             <td class={used === 'ref' ? 'used' : ''}>
               <span class="num-b">{r.ref ? fmt(r.ref.ta, 2) + '°' : '—'}</span>
@@ -260,7 +261,7 @@ function ReportSheet(p: { rep: Report; printedAt: number; zoom: number; onOverfl
         <Fig cls="psa-fa" kind="fa" label="PSA · B (F/A)" desc="③ 주판 · ④⑤와 평행" />
       </div>
 
-      <Band n={3} title="캡별 결과" right="회전오차 = B 실측으로 역산한 실제 δ − 도면 δ" />
+      <Band n={3} title="캡별 결과" right="회전오차 = B 실측으로 역산한 실제 δ − 도면 δ (외판 위 각도)" />
       {lv < 3 ? (
         <table class="rpt-res">
           <thead>
@@ -354,6 +355,12 @@ function Checks(p: { rep: Report }) {
   if (r.sameSign.warn) {
     lines.push({ kind: 'warn', text: `모든 캡이 ${r.sameSign.sign > 0 ? '선수' : '선미'} 쪽으로 돌았어요 — 블록 세팅 · 마킹 기준 확인 필요` });
   }
+  if (r.noShellCaps.length) {
+    lines.push({ kind: 'warn', text: `${r.noShellCaps.join(', ')} : 캡 자리 외판 기울기 없이 계산 — 서 있는 외판이면 회전오차가 크게 틀릴 수 있어요` });
+  }
+  if (r.turned) {
+    lines.push({ kind: 'ok', text: '턴오버 후 확인 — 지주캡이 하늘을 보는 자세로 캡 방향을 계산했어요' });
+  }
   return (
     <>
       {lines.map((l) => (
@@ -388,7 +395,7 @@ function Fig(p: { cls: string; kind: 'ta' | 'fa'; label: string; desc: string })
 function ResRow(p: { row: ReportRow; compact?: boolean }) {
   const x = p.row;
   const c = !!p.compact;
-  const dTxt = Math.abs(x.delta) < 1e-9 ? '0°' : `${fmt(x.delta, 0)}° ${dirName(x.capDir)}`;
+  const dTxt = Math.abs(x.delta) < 1e-9 ? '0°' : `${fmt(x.delta, 0)}° ${dirName(x.capDir)}${x.shell != null ? ` · 외판 ${fmt(x.shell, 0)}°` : ''}`;
   if (!x.measured) {
     return (
       <tr class="none">

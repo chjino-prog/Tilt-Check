@@ -1275,6 +1275,11 @@ textarea.input {
   background: var(--blue-weak);
   color: var(--blue-weak-text);
 }
+.badges {
+  display: inline-flex;
+  flex: none;
+  gap: 4px;
+}
 /* 카드 안 세그먼트 : 카드 바탕과 구분되게 */
 .card .seg {
   background: var(--bg);
@@ -1708,6 +1713,52 @@ textarea.input {
   width: 96px;
   height: 96px;
   flex: none;
+}
+
+/* 캡 자리 외판 기울기 그림 (FR 단면) */
+.shell-fig {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  height: auto;
+  margin: 4px auto 0;
+  background: var(--fig-bg);
+  border-radius: 16px;
+}
+.shell-fig .hull {
+  fill: none;
+  stroke: var(--text);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+.shell-fig .cap {
+  fill: var(--orange-weak);
+  stroke: var(--orange);
+  stroke-width: 1.5;
+}
+.shell-fig .tan {
+  stroke: var(--blue);
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+}
+.shell-fig .hz {
+  stroke: var(--text-4);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 4;
+}
+.shell-fig .ang {
+  fill: none;
+  stroke: var(--blue);
+  stroke-width: 1.5;
+}
+.shell-fig text {
+  font-size: 11px;
+  fill: var(--text-2);
+}
+.shell-fig text.on {
+  font-size: 14px;
+  font-weight: 700;
+  fill: var(--blue-weak-text);
 }
 .fa-dir-card .t {
   font-size: 12px;

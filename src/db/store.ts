@@ -14,6 +14,7 @@ export interface Block {
   refFaDir?: Dir; // 현물에서 잰 F.A 방향 (LONGL. 라인 높은 쪽의 반대)
   refAt?: number; // 현물값을 잰 시각
   basis?: Basis; // 계산 기준 (도면 / 현물)
+  capUp?: boolean; // 턴오버 후 확인 — 지주캡이 하늘을 보는 자세에서 잼 (없으면 바닥 = 보통)
   memo: string;
   createdAt: number;
   updatedAt: number;
@@ -23,8 +24,9 @@ export interface Cap {
   id: string;
   blockId: string;
   no: string; // 캡 No
-  delta: number; // δ (도면)
+  delta: number; // δ (도면 캡취부각도 = 외판 면 위 각도)
   dir: Dir; // 선수 +1 / 선미 −1
+  shell?: number; // 캡 자리 외판 기울기 (FR 단면에서 외판 접선과 A/B 수평선 사이, 0~90°). δ 0 캡은 없음
   createdAt: number;
 }
 
@@ -36,16 +38,23 @@ export interface MeasureRecord {
   blockId: string;
   ship: string;
   block: string;
-  ta: number; // 계산에 쓴 T.A
+  ta: number; // 계산에 쓴 T.A (실제 경사. 1.6.0 전 도면 기준 기록은 도면 값 그대로)
+  taDesign?: number; // 도면 기준일 때 도면에 적힌 T.A (1.6.0 부터)
   fa: number; // 계산에 쓴 F.A (크기)
   faDir?: Dir; // 계산에 쓴 F.A 방향 (예전 기록은 없음 = 선수)
   basis?: Basis; // 그때 쓴 기준 (예전 기록은 없음 = 도면)
   mode: 'cap' | 'line';
+  calcRev?: number; // 계산 방식 : 2 = 1.6.0 (외판 기울기 · 턴오버 · 도면 T.A 경사). 없으면 그 전
+  recalcAt?: number; // 잰 값은 그대로 두고 새 계산으로 다시 계산한 시각
   // 지주캡
   capId?: string;
   capNo?: string;
-  delta?: number;
+  delta?: number; // 도면 δ (외판 면 위)
   dir?: Dir;
+  shell?: number; // 계산에 쓴 캡 자리 외판 기울기
+  up?: boolean; // 턴오버 후 (캡이 하늘을 보는 자세)에서 잼
+  deltaCap?: number; // 계산에 쓴 캡 상판 δ
+  deltaRealCap?: number | null; // B 로 역산한 실제 상판 δ
   normalA?: number;
   normalB?: number;
   measA?: number;
@@ -53,8 +62,8 @@ export interface MeasureRecord {
   highB?: Dir; // B 를 잴 때 높았던 쪽 (현장 기록 그대로)
   errA?: number;
   errB?: number;
-  deltaReal?: number | null;
-  rotErr?: number | null;
+  deltaReal?: number | null; // 실제 δ (외판 위 각도, 도면 δ 와 비교)
+  rotErr?: number | null; // 회전오차 = 실제 δ − 도면 δ
   aResid?: number | null;
   // 일반 부재
   lineLabel?: string; // FRAME 방향 / LONGL. 방향 / 임의각 ψ=…

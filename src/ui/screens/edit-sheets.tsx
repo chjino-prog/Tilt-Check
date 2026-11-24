@@ -1,9 +1,27 @@
 // 블록 · 지주캡 등록/수정 바텀시트
 import { useEffect, useState } from 'preact/hooks';
-import { blockAnglesLookRight, type Dir } from '../../calc/angle';
-import { parseNum } from '../../calc/judge';
+import { blockAnglesLookRight, maxShellDelta, type Dir } from '../../calc/angle';
+import { fmt, parseNum } from '../../calc/judge';
+import { shellDeltaOk } from '../../calc/sign';
 import { newId, saveBlock, saveCap, type Block, type Cap } from '../../db/store';
+import { ShellHelpSheet } from '../components/shell';
 import { Field, NumInput, Seg, Sheet, TextInput, toast } from '../components/ui';
+
+type Face = 'down' | 'up';
+
+/** 지주캡이 보는 쪽 고르기 — 보통은 바닥, 턴오버 후 확인이면 하늘 */
+export function CapFaceSeg(p: { up: boolean; onChange: (up: boolean) => void }) {
+  return (
+    <Seg<Face>
+      value={p.up ? 'up' : 'down'}
+      onChange={(v) => p.onChange(v === 'up')}
+      options={[
+        { v: 'down', label: '바닥 (보통)' },
+        { v: 'up', label: '하늘 (턴오버 후)' },
+      ]}
+    />
+  );
+}
 
 export function BlockSheet(p: { open: boolean; block?: Block | null; onClose: () => void; onSaved: (b: Block) => void }) {
   const [ship, setShip] = useState('');
@@ -11,6 +29,7 @@ export function BlockSheet(p: { open: boolean; block?: Block | null; onClose: ()
   const [ta, setTa] = useState('');
   const [fa, setFa] = useState('');
   const [faDir, setFaDir] = useState<Dir | null>(null);
+  const [capUp, setCapUp] = useState(false);
   const [memo, setMemo] = useState('');
 
   useEffect(() => {
@@ -21,6 +40,7 @@ export function BlockSheet(p: { open: boolean; block?: Block | null; onClose: ()
     setTa(b?.ta != null ? String(b.ta) : '');
     setFa(b?.fa != null ? String(Math.abs(b.fa)) : '');
     setFaDir(b?.faDir ?? null);
+    setCapUp(!!b?.capUp);
     setMemo(b?.memo ?? '');
   }, [p.open, p.block]);
 
@@ -45,6 +65,7 @@ export function BlockSheet(p: { open: boolean; block?: Block | null; onClose: ()
       ta: taN,
       fa: faN,
       faDir: faDir ?? undefined,
+      capUp: capUp || undefined,
       memo: memo.trim(),
       createdAt: p.block?.createdAt ?? now,
       updatedAt: now,
@@ -87,6 +108,9 @@ export function BlockSheet(p: { open: boolean; block?: Block | null; onClose: ()
       {half && <div class="warn-text">T.A · F.A 는 둘 다 넣거나 둘 다 비워주세요.</div>}
       {needDir && faDir == null && <div class="warn-text">FRAME 이 누운 쪽(선수 / 선미)을 골라주세요.</div>}
       {odd && <div class="warn-text">보통은 0 &lt; F.A ≤ T.A &lt; 90° 예요. T.A · F.A 정의가 맞는지 확인해주세요.</div>}
+      <Field label="잴 때 지주캡이 보는 쪽" hint="보통은 바닥이에요. 턴오버해서 캡이 하늘을 볼 때 재면 '하늘' — 캡 방향 계산을 뒤집어요">
+        <CapFaceSeg up={capUp} onChange={setCapUp} />
+      </Field>
       <Field label="메모 (선택)">
         <TextInput value={memo} onInput={setMemo} placeholder="위치 · 특이사항" />
       </Field>
@@ -106,17 +130,24 @@ export function CapSheet(p: { open: boolean; blockId: string; cap?: Cap | null; 
   const [no, setNo] = useState('');
   const [delta, setDelta] = useState('');
   const [dir, setDir] = useState<Dir>(1);
+  const [shell, setShell] = useState('');
+  const [help, setHelp] = useState(false);
 
   useEffect(() => {
     if (!p.open) return;
     setNo(p.cap?.no ?? '');
     setDelta(p.cap ? String(p.cap.delta) : '');
     setDir(p.cap?.dir ?? 1);
+    setShell(p.cap?.shell != null ? String(p.cap.shell) : '');
   }, [p.open, p.cap]);
 
   const dN = parseNum(delta);
-  const ready = no.trim() !== '' && dN != null && dN >= 0 && dN < 90;
   const zero = dN != null && Math.abs(dN) < 1e-9;
+  const sRaw = parseNum(shell);
+  const sN = zero || sRaw == null ? null : Math.abs(sRaw);
+  const shellRange = sN == null || sN < 90;
+  const shellFits = dN == null || sN == null || shellDeltaOk(dN, sN);
+  const ready = no.trim() !== '' && dN != null && dN >= 0 && dN < 90 && shellRange && shellFits;
 
   const save = async () => {
     if (!ready) return;
@@ -126,6 +157,7 @@ export function CapSheet(p: { open: boolean; blockId: string; cap?: Cap | null; 
       no: no.trim(),
       delta: dN!,
       dir: zero ? 1 : dir, // δ 0 캡은 돌아간 방향이 뜻이 없다 — 늘 선수로 둔다
+      shell: sN ?? undefined, // δ 0 캡은 외판 기울기가 필요 없다
       createdAt: p.cap?.createdAt ?? Date.now(),
     };
     await saveCap(c);
@@ -134,35 +166,51 @@ export function CapSheet(p: { open: boolean; blockId: string; cap?: Cap | null; 
   };
 
   return (
-    <Sheet open={p.open} onClose={p.onClose}>
-      <h2>{p.cap ? '지주캡 수정' : '지주캡 추가'}</h2>
-      <p class="sub">도면의 캡 취부각도를 넣어주세요</p>
-      <Field label="캡 No">
-        <TextInput value={no} onInput={setNo} placeholder="예: 1" autoFocus={!p.cap} />
-      </Field>
-      <Field label="δ 캡 취부각도" hint="WEB 이 FRAME 기준으로 돌아간 각도예요. 안 돌아갔으면 0">
-        <NumInput value={delta} onInput={(v) => setDelta(v.replace(/[-−]/g, ''))} placeholder="0" unit="°" />
-      </Field>
-      {!zero && (
-      <Field label="돌아간 방향" hint="도면에 적힌 그대로 (예: 캡 선미로 7°)">
-        <Seg<Dir>
-          value={dir}
-          onChange={setDir}
-          options={[
-            { v: 1, label: '선수 쪽' },
-            { v: -1, label: '선미 쪽' },
-          ]}
-        />
-      </Field>
-      )}
-      <div class="actions">
-        <button class="btn grey" onClick={p.onClose}>
-          닫기
-        </button>
-        <button class="btn" disabled={!ready} onClick={save}>
-          {p.cap ? '저장' : '추가'}
-        </button>
-      </div>
-    </Sheet>
+    <>
+      <Sheet open={p.open} onClose={p.onClose}>
+        <h2>{p.cap ? '지주캡 수정' : '지주캡 추가'}</h2>
+        <p class="sub">도면의 캡 취부각도를 넣어주세요</p>
+        <Field label="캡 No">
+          <TextInput value={no} onInput={setNo} placeholder="예: 1" autoFocus={!p.cap} />
+        </Field>
+        <Field label="δ 캡 취부각도" hint="도면 캡취부각도 그대로 (외판 위에서 FR 선과 캡 중심선 사이). 안 돌아갔으면 0">
+          <NumInput value={delta} onInput={(v) => setDelta(v.replace(/[-−]/g, ''))} placeholder="0" unit="°" />
+        </Field>
+        {!zero && (
+          <>
+            <Field label="돌아간 방향" hint="도면에 적힌 그대로 (예: 캡 선미로 7°)">
+              <Seg<Dir>
+                value={dir}
+                onChange={setDir}
+                options={[
+                  { v: 1, label: '선수 쪽' },
+                  { v: -1, label: '선미 쪽' },
+                ]}
+              />
+            </Field>
+            <Field label="캡 자리 외판 기울기" hint="FR 단면에서 외판 접선과 A/B 수평선 사이 각. 모르면 비워 두세요 — 서 있는 외판이면 회전오차가 크게 틀려요">
+              <NumInput value={shell} onInput={(v) => setShell(v.replace(/[-−]/g, ''))} placeholder="예: 60" unit="°" />
+            </Field>
+            <button class="text-btn" style={{ marginTop: '-4px', marginBottom: '8px' }} onClick={() => setHelp(true)}>
+              어디를 재나요?
+            </button>
+            {!shellRange && <div class="warn-text">외판 기울기는 0 ~ 90° 사이로 넣어주세요.</div>}
+            {shellRange && !shellFits && sN != null && (
+              <div class="warn-text">외판이 {fmt(sN, 1)}° 면 δ 는 {fmt(maxShellDelta(sN), 1)}° 보다 작아야 해요. 도면 δ 와 외판 기울기를 확인해주세요.</div>
+            )}
+          </>
+        )}
+        <div class="actions">
+          <button class="btn grey" onClick={p.onClose}>
+            닫기
+          </button>
+          <button class="btn" disabled={!ready} onClick={save}>
+            {p.cap ? '저장' : '추가'}
+          </button>
+        </div>
+      </Sheet>
+      {/* 도움말은 등록 시트 밖에 둬야 위에 바르게 뜬다 */}
+      <ShellHelpSheet open={p.open && help} onClose={() => setHelp(false)} />
+    </>
   );
 }

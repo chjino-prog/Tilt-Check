@@ -1,7 +1,7 @@
 // 블록 상세 : 설계값 · 지주캡 목록 · 일반 부재(추가 기능)
 import { useEffect, useState } from 'preact/hooks';
 import { blockAnglesLookRight } from '../../calc/angle';
-import { effectiveAngles, hasDesign, hasRef, type Basis } from '../../calc/basis';
+import { designSlope, effectiveAngles, hasDesign, hasRef, type Basis } from '../../calc/basis';
 import { capDirText, fmt, fmtDate, isLegacyCap, latestPerCap, sameSignWarning, verdictLevel } from '../../calc/judge';
 import { leanText, rotText } from '../../calc/sign';
 import { deleteBlock, duplicateBlock, getBlock, listCaps, listRecordsByBlock, saveBlock, type Block, type Cap, type MeasureRecord } from '../../db/store';
@@ -66,8 +66,8 @@ export function BlockScreen(p: { id: string }) {
   };
   const goRef = () => go(`/block/${block.id}/ref`);
   const faName = eff ? (eff.faDirSet ? `FRAME ANGLE · ${leanText(eff.faDir)}` : 'FRAME ANGLE · 누운 쪽 미정') : '';
-  /** 지금 기준 값 + 아래에 다른 쪽 값 */
-  const angleRow = (key: string, name: string, v: number, other: number | null, otherName: string) => (
+  /** 지금 기준 값 + 아래에 덧붙임 (다른 쪽 값 · 도면 T.A 의 실제 경사) */
+  const angleRow = (key: string, name: string, v: number, other: string | null) => (
     <div class="angle-row">
       <span class="k">
         <b>{key}</b> {name}
@@ -75,14 +75,14 @@ export function BlockScreen(p: { id: string }) {
       <span class="v num">
         {fmt(v, 3)}
         <small>°</small>
-        {other != null && (
-          <span class="other">
-            {otherName} {fmt(other, 3)}
-          </span>
-        )}
+        {other && <span class="other">{other}</span>}
       </span>
     </div>
   );
+  // 도면 T.A 는 실제 경사로 바꿔 계산한다 — 도면 값과 다를 때만 덧붙인다
+  const slopeNote = design ? designSlope(block.ta!, block.fa!) : null;
+  const slopeText = slopeNote != null && Math.abs(slopeNote - Math.abs(block.ta!)) >= 0.0005 ? `경사 ${fmt(slopeNote, 3)}` : null;
+  const join = (...xs: (string | null)[]) => xs.filter(Boolean).join(' · ') || null;
 
   return (
     <div class="screen">
@@ -112,14 +112,15 @@ export function BlockScreen(p: { id: string }) {
             )}
             {eff.basis === 'ref'
               ? [
-                  angleRow('T.A', 'TRANSVERSE ANGLE', eff.ta, block.ta, '도면'),
-                  angleRow('F.A', faName, eff.fa, block.fa, '도면'),
+                  angleRow('T.A', 'TRANSVERSE ANGLE', eff.ta, design ? join(`도면 ${fmt(Math.abs(block.ta!), 3)}`, slopeText) : null),
+                  angleRow('F.A', faName, eff.fa, design ? `도면 ${fmt(Math.abs(block.fa!), 3)}` : null),
                 ]
               : [
-                  angleRow('T.A', 'TRANSVERSE ANGLE', eff.ta, ref ? block.refTa! : null, '현물'),
-                  angleRow('F.A', faName, eff.fa, ref ? block.refFa! : null, '현물'),
+                  angleRow('T.A', 'TRANSVERSE ANGLE', eff.taDesign ?? eff.ta, join(slopeText, ref ? `현물 ${fmt(block.refTa!, 3)}` : null)),
+                  angleRow('F.A', faName, eff.fa, ref ? `현물 ${fmt(block.refFa!, 3)}` : null),
                 ]}
             {odd && <div class="note c-warn">0 &lt; F.A ≤ T.A &lt; 90° 가 아니에요. 정의를 확인해주세요.</div>}
+            {block.capUp && <div class="note c-warn">턴오버 후 확인 · 지주캡이 하늘을 보는 자세로 계산해요</div>}
             <div class="card-foot">
               <span class="num">{ref ? `현물값 ${fmtDate(block.refAt ?? block.updatedAt).slice(5)} 에 잼` : '도면값으로 계산해요'}</span>
               <button class="text-btn" onClick={goRef}>
@@ -152,7 +153,9 @@ export function BlockScreen(p: { id: string }) {
                   <div class="t1">캡 {c.no}</div>
                   <div class="t2 num">
                     δ {Number(c.delta.toFixed(3))}° {capDirText(c.delta, c.dir)}
+                    {Math.abs(c.delta) >= 1e-9 && (c.shell != null ? ` · 외판 ${Number(c.shell.toFixed(1))}°` : '')}
                     {r?.rotErr != null && !isLegacyCap(r) && ` · ${rotText(r.rotErr, c.delta, r.dir ?? c.dir)}`}
+                    {Math.abs(c.delta) >= 1e-9 && c.shell == null && <span class="c-warn"> · 외판 기울기 없음</span>}
                   </div>
                 </div>
                 <div class="tail">

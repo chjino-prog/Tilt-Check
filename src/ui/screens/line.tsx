@@ -3,6 +3,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { thetaLine, type Dir } from '../../calc/angle';
 import { calcDir, dirName, faHighSide, longlDev } from '../../calc/sign';
 import { effectiveAngles } from '../../calc/basis';
+import { CALC_REV } from '../../calc/capcalc';
 import { fmt, lineVerdict, parseNum } from '../../calc/judge';
 import { getBlock, newId, saveRecord, type Block } from '../../db/store';
 import { go } from '../router';
@@ -81,11 +82,13 @@ export function LineScreen(p: { blockId: string }) {
       blockId: block.id,
       ship: block.ship,
       block: block.block,
-      ta: eff.ta,
+      ta: eff.ta, // 실제 경사 (도면 기준이면 바꾼 값)
+      taDesign: eff.taDesign,
       fa: eff.fa,
       faDir: eff.faDir,
       basis: eff.basis,
       mode: 'line',
+      calcRev: CALC_REV,
       lineLabel: longl && (h.high || h.flat) ? `${label} · ${h.high ? dirName(h.high) + ' 높음' : '수평'}` : label,
       normal: normal!,
       meas: m.fixed!,
@@ -131,7 +134,7 @@ export function LineScreen(p: { blockId: string }) {
         <div class="normal-pill num mt8">
           정상값 <b>{normal == null || !isFinite(normal) ? '—' : fmt(Math.abs(normal), 2) + '°'}</b>
           {longl && eff.fa > 0.05 && <b> · {dirName(expectHigh)} 쪽이 높음</b>}
-          <span style={{ color: 'var(--text-3)', fontSize: '13px' }}>{mode === 'frame' ? '= T.A' + refTag : mode === 'longl' ? `= F.A ${dirName(eff.faDir)}` + refTag : refTag.trim()}</span>
+          <span style={{ color: 'var(--text-3)', fontSize: '13px' }}>{mode === 'frame' ? (eff.taDesign != null && Math.abs(eff.taDesign - eff.ta) >= 0.005 ? '= T.A 경사' : '= T.A') + refTag : mode === 'longl' ? `= F.A ${dirName(eff.faDir)}` + refTag : refTag.trim()}</span>
         </div>
       </div>
       {mode === 'psi' && normal != null && isFinite(normal) && Math.abs(normal) < 3 && (

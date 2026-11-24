@@ -4,7 +4,7 @@
 // 방향은 'FRAME 이 누운 쪽'으로 받고 보여준다 (= F.A 방향 = LONGL. 라인의 낮은 끝).
 import { useEffect, useState } from 'preact/hooks';
 import { blockAnglesLookRight, type Dir } from '../../calc/angle';
-import { hasDesign, refFromMeasure } from '../../calc/basis';
+import { designSlope, hasDesign, refFromMeasure } from '../../calc/basis';
 import { devLevel, fmt, fmtSigned } from '../../calc/judge';
 import { dirName, leanFromFace, leanOfLonglHigh, leanText, longlHighOfLean } from '../../calc/sign';
 import { clearDraft, loadDraft, saveDraft, type Draft, type Reading } from '../../db/draft';
@@ -116,6 +116,9 @@ export function RefScreen(p: { blockId: string }) {
   const sheet = <RefGuideSheet open={guide} onClose={() => setGuide(false)} />;
   const designFa = hasDesign(block) ? block.fa : null;
   const designFaLabel = `도면 F.A${block.faDir ? ' · ' + leanText(block.faDir) : ''}`;
+  // 폰은 실제 경사를 재므로 도면 T.A 도 경사로 바꿔 비교한다
+  const designTa = hasDesign(block) ? designSlope(block.ta!, block.fa!) : null;
+  const designTaLabel = hasDesign(block) && Math.abs(designTa! - Math.abs(block.ta!)) >= 0.005 ? `도면 T.A ${fmt(Math.abs(block.ta!), 2)}° → 경사` : '도면 T.A';
 
   if (stage === 'hub') {
     const row = (key: Stage, n: string, name: string, where: string, r: Reading | undefined, side?: string) => (
@@ -195,8 +198,8 @@ export function RefScreen(p: { blockId: string }) {
         title={isTa ? 'FRAME 방향 수평선에 폰을 대주세요' : 'LONGL. 라인에 폰을 대주세요'}
         sub={isTa ? 'DECK · FLAT · STRINGER 상면이나 웹 수평 보강재 · 어느 쪽으로 대도 돼요' : 'CENTER LINE 과 평행한 GIRDER · 론지 위 · SHEER 없는 곳'}
         note={isTa ? '폰을 세워 긴 옆면을 대요. 용접 비드 · 덧판은 피해요' : 'ANGLE 부재는 변형되기 쉬워요. 되도록 GIRDER 류 강력부재에 대주세요'}
-        design={hasDesign(block) ? (isTa ? block.ta : block.fa) : null}
-        designLabel={isTa ? '도면 T.A' : designFaLabel}
+        design={isTa ? designTa : designFa}
+        designLabel={isTa ? designTaLabel : designFaLabel}
         onGuide={() => setGuide(true)}
         onWeb={isTa ? undefined : () => setFaMethod('web')}
         onDone={onDone(isTa)}
@@ -538,7 +541,8 @@ function RefResult(p: { bar: preact.JSX.Element; block: Block; rTa: Reading; rFa
   const lean = leanOf(p.rFa); // = refFaDir
   const web = p.rFa.method === 'web';
   const design = hasDesign(block);
-  const dTa = design ? refTa - Math.abs(block.ta!) : null;
+  const taCmp = design ? designSlope(block.ta!, block.fa!) : null; // 도면 T.A 를 실제 경사로 바꿔 비교
+  const dTa = taCmp != null ? refTa - taCmp : null;
   const dFa = design ? refFa - Math.abs(block.fa!) : null;
   const lTa = devLevel(dTa, s);
   const lFa = devLevel(dFa, s);
@@ -557,7 +561,7 @@ function RefResult(p: { bar: preact.JSX.Element; block: Block; rTa: Reading; rFa
     back('/block/' + block.id);
   };
 
-  const card = (k: string, v: number, d: number | null, lvl: string, dv: number | null) => (
+  const card = (k: string, v: number, d: string | null, lvl: string, dv: number | null) => (
     <div class="card">
       <div class="k">
         <b>{k}</b> 현물
@@ -568,11 +572,13 @@ function RefResult(p: { bar: preact.JSX.Element; block: Block; rTa: Reading; rFa
       </div>
       {d != null && (
         <div class="d">
-          도면 {fmt(d, 2)} · <em class={'c-' + lvl}>{fmtSigned(dv, 2)}</em>
+          {d} · <em class={'c-' + lvl}>{fmtSigned(dv, 2)}</em>
         </div>
       )}
     </div>
   );
+  const taD =
+    taCmp == null ? null : Math.abs(taCmp - Math.abs(block.ta!)) >= 0.005 ? `도면 ${fmt(Math.abs(block.ta!), 2)}→경사 ${fmt(taCmp, 2)}` : `도면 ${fmt(taCmp, 2)}`;
 
   return (
     <div class="screen">
@@ -604,8 +610,8 @@ function RefResult(p: { bar: preact.JSX.Element; block: Block; rTa: Reading; rFa
         </div>
       )}
       <div class="section ref-cmp num">
-        {card('T.A', refTa, design ? Math.abs(block.ta!) : null, lTa, dTa)}
-        {card('F.A ' + (refFaDir ? dirName(refFaDir) : ''), refFa, design ? Math.abs(block.fa!) : null, lFa, dFa)}
+        {card('T.A', refTa, taD, lTa, dTa)}
+        {card('F.A ' + (refFaDir ? dirName(refFaDir) : ''), refFa, design ? `도면 ${fmt(Math.abs(block.fa!), 2)}` : null, lFa, dFa)}
       </div>
       {dirClash && (
         <div class="alert bad">

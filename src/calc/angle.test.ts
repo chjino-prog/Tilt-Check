@@ -1,10 +1,30 @@
 // 작업지시서 3장 기준값 — 모두 ±0.01° 이내 (표의 반올림 자리 기준)
 import { describe, expect, it } from 'vitest';
-import { analyzeCap, dA, dB, inverseDelta, normDeg, thetaA, thetaB, thetaLine, type Dir } from './angle';
-import { analyzeCapDir, bDevText, calcDir, capNormalDir, dirSuspect, faHighSide, flipSuspect, highFromPhone, highOfB, highSensitive, longlDev, rotText, rotToBow, signedA, signedB } from './sign';
+import { analyzeCap, capDeltaFromShell, dA, dB, inverseDelta, normDeg, shellDeltaFromCap, shellScale, taSlope, thetaA, thetaB, thetaLine, type Dir } from './angle';
+import {
+  analyzeCapDir,
+  bDevText,
+  calcDir,
+  capNormalDir,
+  dirSuspect,
+  faHighSide,
+  flipSuspect,
+  highFromPhone,
+  highOfB,
+  highSensitive,
+  longlDev,
+  rotText,
+  rotToBow,
+  shellDeltaOk,
+  signedA,
+  signedB,
+  type CapGeom,
+} from './sign';
 import { fmt, fmtSigned, isLegacyCap, sameSignWarning } from './judge';
-import { recordsToCsv } from './csv';
-import type { MeasureRecord } from '../db/store';
+import { CSV_HEADER, recordsToCsv } from './csv';
+import { capGeom, recalcCapRecord } from './capcalc';
+import type { Block, Cap, MeasureRecord } from '../db/store';
+import { DEFAULTS } from '../settings';
 
 const near = (actual: number, expected: number, tol = 0.01) => {
   // 표 값(소수 2자리)과의 차이가 0.01° 이하
@@ -255,7 +275,9 @@ describe('방향 실수 점검', () => {
     const old = { id: 'o', createdAt: 0, blockId: 'b', ship: 'S', block: 'B', ta: 34.41, fa: 3.23, mode: 'cap', capId: 'c', delta: 7, dir: -1, measB: 1.6, normalB: 7.17, rotErr: -7.84, verdict: 'NG', memo: '' } as MeasureRecord;
     expect(isLegacyCap(old)).toBe(true);
     const row = recordsToCsv([old]).trim().split(/\r?\n/)[1].split(',');
-    expect(row.slice(-2)).toEqual(['', '']);
+    const at = (h: string) => row[CSV_HEADER.indexOf(h)];
+    expect([at('실측B높은쪽'), at('정상B높은쪽')]).toEqual(['', '']);
+    expect(at('계산방식')).toBe('1.6.0 전');
     expect(sameSignWarning([old, { ...old, id: 'p', capId: 'd' }]).warn).toBe(false);
   });
 
@@ -263,5 +285,151 @@ describe('방향 실수 점검', () => {
     expect(fmt(-0.65, 2)).toBe('−0.65');
     expect(fmtSigned(-0.65, 2)).toBe('−0.65');
     expect(fmt(-0.001, 2)).toBe('0.00');
+  });
+});
+
+// ── 1.6.0 (2026-11-24 현장 분석) : 외판 기울기 · 도면 T.A 경사 · 턴오버
+describe('외판 기울기 보정 (도면 δ = 외판 면 위 각도)', () => {
+  it('외판이 누워 있으면(0°) 그대로, 서 있을수록 상판 각도가 커진다', () => {
+    expect(capDeltaFromShell(7, 0)).toBeCloseTo(7, 9);
+    near(capDeltaFromShell(7, 43.5), 9.67);
+    near(capDeltaFromShell(5, 54.5), 8.63);
+    near(capDeltaFromShell(7, 55), 12.27);
+    near(capDeltaFromShell(3, 73), 10.31);
+    near(capDeltaFromShell(2, 71.5), 6.31);
+  });
+
+  it('거꾸로 바꾸면 제자리 · 부호 유지 · δ ≥ 90° − θ 는 불가능', () => {
+    for (const th of [0, 20, 45, 60, 73, 85])
+      for (const d of [-4, -1, 0.5, 2, 3, 4.9]) {
+        if (Math.abs(d) >= 90 - th) continue;
+        expect(shellDeltaFromCap(capDeltaFromShell(d, th), th)).toBeCloseTo(d, 9);
+      }
+    expect(capDeltaFromShell(-3, 73)).toBeCloseTo(-capDeltaFromShell(3, 73), 9);
+    expect(capDeltaFromShell(17.5, 73)).toBeNaN();
+    expect(shellDeltaOk(17.5, 73)).toBe(false);
+    expect(shellDeltaOk(3, 73)).toBe(true);
+    expect(shellDeltaOk(30, null)).toBe(true);
+  });
+
+  it('작은 δ 는 대략 δ ÷ cos θ, 도면 1° 당 상판 회전도 1 ÷ cos θ', () => {
+    near(shellScale(0, 60), 2, 1e-4);
+    near(shellScale(0, 73), 1 / Math.cos((73 * Math.PI) / 180), 1e-4);
+  });
+
+  it('δ 0 캡 · 외판 기울기 없음은 예전 계산과 같다', () => {
+    expect(capGeom({ delta: 0, shell: 70 }, { capUp: true })).toEqual({ shell: null, up: true });
+    expect(capGeom({ delta: 3, shell: 70 }, null)).toEqual({ shell: 70, up: false });
+    const a = analyzeCapDir(34.41, 3.23, -1, 7, -1, 34.6, 0.5);
+    const b = analyzeCapDir(34.41, 3.23, -1, 7, -1, 34.6, 0.5, { shell: null, up: false });
+    expect(b.rotErr).toBe(a.rotErr);
+    expect(b.deltaCap).toBe(7);
+  });
+});
+
+describe('도면 T.A → 실제 경사', () => {
+  it('sin(경사) = sin T.A · cos F.A', () => {
+    near(taSlope(47.846, 13.074), 46.23);
+    near(taSlope(46.25, 8.84), 45.54);
+    near(taSlope(34.41, 3.23), 34.35);
+    expect(taSlope(30, 0)).toBeCloseTo(30, 9);
+  });
+});
+
+/** 3차원 모형 (배 좌표 x 선수 · y 바깥 · z 위). up = 턴오버 후(캡이 하늘을 봄), dc = 캡 상판에서 돌아간 실제 각 */
+function model(TA: number, FA: number, faDir: Dir, up: boolean, dc: number, capDir: Dir) {
+  const sT = sd(TA);
+  const sF = sd(FA);
+  const c0 = Math.sqrt(1 - sT * sT - sF * sF);
+  const u = up ? 1 : -1;
+  const Z = [-faDir * sF, u * sT, -u * c0]; // 작업장 연직 : F.A 방향 쪽 끝이 낮고, 턴오버면 바깥 끝이 높다
+  const w = [capDir * sd(dc), cd(dc), 0]; // WEB 바깥(외판 쪽) 끝 — 도면의 '돌아간 방향' 으로 간다
+  const b = [cd(dc), -capDir * sd(dc), 0]; // 브라켓 방향 (선수 쪽 끝)
+  const dot = (p: number[], q: number[]) => p[0] * q[0] + p[1] * q[1] + p[2] * q[2];
+  return { A: asd(Math.abs(dot(w, Z))), Bbow: asd(dot(b, Z)), outerHigh: dot(w, Z) > 0 };
+}
+
+function fieldRun2(TA: number, FA: number, faDir: Dir, delta: number, capDir: Dir, g: CapGeom, Bbow: number, A: number) {
+  const high = Math.abs(Bbow) < 0.005 ? undefined : ((Bbow > 0 ? 1 : -1) as Dir);
+  const n = capNormalDir(TA, FA, faDir, delta, capDir, g);
+  const mB = high ? signedB(Math.abs(Bbow), high, faDir) : 0;
+  return analyzeCapDir(TA, FA, faDir, delta, capDir, signedA(Math.abs(A), n.thetaA), mB, g);
+}
+
+describe('턴오버 · 외판 기울기 실물 모형', () => {
+  it('캡이 바닥을 보면 바깥 끝이 낮고, 하늘을 보면 높다', () => {
+    expect(model(46.66, 13.42, 1, false, 10, -1).outerHigh).toBe(false);
+    expect(model(46.66, 13.42, 1, true, 10, -1).outerHigh).toBe(true);
+    expect(calcDir(-1, 1)).toBe(-1);
+    expect(calcDir(-1, 1, true)).toBe(1);
+  });
+
+  it('모든 조합에서 도면 기준 회전오차를 되찾는다', () => {
+    let bad = 0;
+    let runs = 0;
+    for (const TA of [20, 34.41, 46.66, 60])
+      for (const FA of [0.5, 3.23, 8.84, 13.42])
+        for (const faDir of [1, -1] as Dir[])
+          for (const capDir of [1, -1] as Dir[])
+            for (const up of [false, true])
+              for (const shell of [0, 30, 55, 73])
+                for (const delta of [2, 3, 7])
+                  for (const rot of [-1, -0.3, 0, 0.3, 1]) {
+                    if (delta + 1 >= 90 - shell) continue;
+                    const g = { shell, up };
+                    const dReal = shell > 0 ? capDeltaFromShell(delta + rot, shell) : delta + rot;
+                    const t = model(TA, FA, faDir, up, dReal, capDir);
+                    const r = fieldRun2(TA, FA, faDir, delta, capDir, g, t.Bbow, t.A);
+                    const tol = Math.abs(t.Bbow) < 0.005 ? 0.05 : 1e-6;
+                    runs++;
+                    if (r.rotErr == null || Math.abs(r.rotErr - rot) > tol || Math.abs(r.aResid!) > 1e-6) bad++;
+                  }
+    expect(runs).toBeGreaterThan(1000);
+    expect(bad).toBe(0);
+  });
+
+  it('턴오버 후 잰 PSA 캡 (2026-11-24 현장값) — 두 가지를 다 넣어야 맞는다', () => {
+    // 현물 T.A 46.66 · F.A 13.42 선수로 누움, 도면 δ 3° 선미, 외판 73°, 실측 A 48.10 · B 6.46 선미 높음
+    const mB = signedB(6.46, -1, 1);
+    // 예전 계산 : 방향이 반대로 보이고 회전오차 −12°
+    expect(dirSuspect(46.66, 13.42, 1, 3, -1, 48.1)).not.toBeNull();
+    near(analyzeCapDir(46.66, 13.42, 1, 3, -1, 48.1, mB).rotErr!, -12.22);
+    // 턴오버만 넣으면 방향은 맞지만 6° 더 돈 것처럼 보인다
+    expect(dirSuspect(46.66, 13.42, 1, 3, -1, 48.1, { up: true })).toBeNull();
+    near(analyzeCapDir(46.66, 13.42, 1, 3, -1, 48.1, mB, { up: true }).rotErr!, 6.22);
+    // 외판 기울기까지 넣으면 도면 3° 에 0.3° 차이
+    const r = analyzeCapDir(46.66, 13.42, 1, 3, -1, 48.1, mB, { up: true, shell: 73 });
+    near(r.deltaCap, 10.31);
+    near(r.deltaReal!, 2.69);
+    near(r.rotErr!, -0.31);
+  });
+
+  it('외판 BASE 캡도 외판 기울기를 넣으면 \'도면보다 더 돌아감\' 이 사라진다 (2026-11-24 현장값)', () => {
+    // 도면 T.A 34.41 · F.A 3.23 선미, δ 7 선미, 외판 43.5°, 실측 A 35.09 · B 2.27 선미 높음
+    const mB = signedB(2.27, -1, -1);
+    near(analyzeCapDir(34.41, 3.23, -1, 7, -1, 35.09, mB).rotErr!, 2.69);
+    near(analyzeCapDir(34.41, 3.23, -1, 7, -1, 35.09, mB, { shell: 43.5 }).rotErr!, 0.01);
+  });
+
+  it('지난 기록 다시 계산 : 잰 값은 그대로, 조건만 새로', () => {
+    const settings = { ...DEFAULTS, rotTol: 2 };
+    const mB = signedB(6.46, -1, 1);
+    const old = {
+      id: 'r', createdAt: 0, blockId: 'b', ship: 'S', block: 'B', ta: 46.66, fa: 13.42, faDir: 1, basis: 'ref', mode: 'cap',
+      capId: 'c', capNo: 'P1', delta: 3, dir: -1, measA: 48.1, measB: mB, highB: -1, rotErr: -12.22, verdict: 'NG', memo: '',
+    } as MeasureRecord;
+    const cap = { id: 'c', blockId: 'b', no: 'P1', delta: 3, dir: -1, shell: 73, createdAt: 0 } as Cap;
+    const block = { id: 'b', ship: 'S', block: 'B', ta: null, fa: null, capUp: true, memo: '', createdAt: 0, updatedAt: 0 } as Block;
+    const r = recalcCapRecord(old, cap, block, settings)!;
+    expect(r.changed).toBe(true);
+    expect(r.suspect).toBe(false);
+    expect(r.next).toMatchObject({ measA: 48.1, measB: mB, highB: -1, shell: 73, up: true, verdict: 'OK', calcRev: 2 });
+    near(r.next.rotErr!, -0.31);
+    // 이미 새 방식으로 계산했고 조건이 같으면 다시 계산할 게 없다
+    expect(recalcCapRecord(r.next, cap, block, settings)!.changed).toBe(false);
+    // 1.6.0 전 도면 기준 기록은 T.A 를 경사로 바꾼다
+    const d = recalcCapRecord({ ...old, basis: 'design', ta: 47.846, fa: 13.074 }, cap, block, settings)!;
+    near(d.next.ta, 46.23);
+    expect(d.next.taDesign).toBe(47.846);
   });
 });

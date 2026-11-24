@@ -29,6 +29,13 @@ export const CSV_HEADER = [
   'F.A방향',
   '실측B높은쪽',
   '정상B높은쪽',
+  // 1.6.0 — 끝에 붙여 예전 칸 위치는 그대로
+  '외판기울기',
+  'δ상판(계산)',
+  '실제δ상판',
+  '캡자세',
+  '도면T.A',
+  '계산방식',
 ];
 
 const side = (d: 1 | -1 | null | undefined) => (d == null ? '수평' : dirName(d));
@@ -70,6 +77,12 @@ export function recordsToCsv(records: MeasureRecord[]): string {
         r.faDir != null ? dirName(r.faDir) : '',
         cap && !legacy && r.measB != null ? side(r.highB ?? highOfB(r.measB, r.faDir ?? 1)) : '',
         cap && !legacy && r.normalB != null ? side(highOfB(r.normalB, r.faDir ?? 1)) : '',
+        cap ? n(r.shell, 1) : '',
+        cap ? n(r.deltaCap) : '',
+        cap ? n(r.deltaRealCap) : '',
+        cap && r.calcRev ? (r.up ? '하늘(턴오버 후)' : '바닥') : '',
+        n(r.taDesign, 3),
+        r.calcRev ? `1.6.0${r.recalcAt ? ' 다시 계산' : ''}` : cap ? '1.6.0 전' : '',
       ];
     });
   // 엑셀에서 한글이 깨지지 않도록 BOM + CRLF

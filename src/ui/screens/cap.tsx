@@ -2,9 +2,10 @@
 // 부호는 쓰지 않는다 — B 는 "숫자 + 높은 쪽(선수/선미)", A 는 숫자만. 부호는 calc/sign.ts 가 붙인다.
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { Dir } from '../../calc/angle';
-import { basisName, effectiveAngles, type Effective } from '../../calc/basis';
+import { basisName, effectiveAngles, taText, type Effective } from '../../calc/basis';
+import { capGeom, capResult } from '../../calc/capcalc';
 import { capDirText, capVerdict, fmt, fmtSigned, parseNum, verdictLevel } from '../../calc/judge';
-import { analyzeCapDir, bDevText, bText, capDirOf, capNormalDir, dirName, dirSuspect, faHighSide, flipSuspect, highOfB, highSensitive, leanText, rotText, signedA, signedB } from '../../calc/sign';
+import { analyzeCapDir, bDevText, bText, capDirOf, capNormalDir, dirName, dirSuspect, faHighSide, flipSuspect, highOfB, highSensitive, leanText, rotText, signedA, signedB, type CapGeom } from '../../calc/sign';
 import { clearDraft, loadDraft, saveDraft, type Draft, type Reading } from '../../db/draft';
 import { deleteCap, getBlock, getCap, newId, saveBlock, saveRecord, type Block, type Cap } from '../../db/store';
 import { setSettings, useSettings } from '../../settings';
@@ -14,7 +15,7 @@ import { ConfirmSheet, Cta, Headline, MenuRow, NumInput, RefNote, RefWarningShee
 import { HeadCard, HighPicker, ReadingCard, useHead, useHighSide, useMeasure } from '../components/reading';
 import { Gauge, PlanFigure } from '../components/gauge';
 import { IBack, ICamera, ICheck, IChevron, IEdit, IImage, IInfo, IMinus, IMore, IRuler, ITrash, IWarn, IX } from '../icons';
-import { CapSheet } from './edit-sheets';
+import { CapFaceSeg, CapSheet } from './edit-sheets';
 import { makePhoto } from './photo';
 
 type Stage = 'ready' | 'B' | 'A' | 'result';
@@ -123,6 +124,36 @@ function FaDirSheet(p: { open: boolean; block: Block; onClose: () => void; onSav
   );
 }
 
+/** 잴 때 지주캡이 보는 쪽 (블록 설정) — 방향 보류 화면에서 바로 고친다 */
+function CapUpSheet(p: { open: boolean; block: Block; onClose: () => void; onSaved: (b: Block) => void }) {
+  const [up, setUp] = useState(!!p.block.capUp);
+  useEffect(() => {
+    if (p.open) setUp(!!p.block.capUp);
+  }, [p.open]);
+  return (
+    <Sheet open={p.open} onClose={p.onClose}>
+      <h2>잴 때 지주캡이 어디를 봐요?</h2>
+      <p class="sub">보통은 바닥이에요. 턴오버해서 캡이 하늘을 볼 때 쟀다면 '하늘' — 캡 WEB 의 외판 쪽 끝이 위로 와서 방향 계산을 뒤집어요</p>
+      <CapFaceSeg up={up} onChange={setUp} />
+      <div class="actions mt16">
+        <button class="btn grey" onClick={p.onClose}>
+          닫기
+        </button>
+        <button
+          class="btn"
+          onClick={async () => {
+            const nb = { ...p.block, capUp: up || undefined, updatedAt: Date.now() };
+            await saveBlock(nb);
+            p.onSaved(nb);
+          }}
+        >
+          저장
+        </button>
+      </div>
+    </Sheet>
+  );
+}
+
 export function CapScreen(p: { blockId: string; capId: string }) {
   const s = useSettings();
   const [block, setBlock] = useState<Block | null | undefined>(undefined);
@@ -133,6 +164,7 @@ export function CapScreen(p: { blockId: string; capId: string }) {
   const [guide, setGuide] = useState(false);
   const [editing, setEditing] = useState(false);
   const [faSheet, setFaSheet] = useState(false);
+  const [upSheet, setUpSheet] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
 
   const load = async () => {
@@ -173,8 +205,10 @@ export function CapScreen(p: { blockId: string; capId: string }) {
         </Cta>
       </div>
     );
-  const normal = capNormalDir(eff.ta, eff.fa, eff.faDir, cap.delta, cap.dir);
+  const g = capGeom(cap, block);
+  const normal = capNormalDir(eff.ta, eff.fa, eff.faDir, cap.delta, cap.dir, g);
   const dirText = capDirText(cap.delta, cap.dir);
+  const noShell = Math.abs(cap.delta) >= 1e-9 && g.shell == null;
   const aWeak = normal.dA < s.aSensMin;
   const lines = capLines(cap.no);
   const title = `캡 ${cap.no}`;
@@ -230,6 +264,16 @@ export function CapScreen(p: { blockId: string; capId: string }) {
           setFaSheet(false);
           setBlock(b);
           toast(`FRAME 이 ${dirName(effectiveAngles(b)?.faDir ?? 1)} 쪽으로 누운 것으로 계산해요`);
+        }}
+      />
+      <CapUpSheet
+        open={upSheet}
+        block={block}
+        onClose={() => setUpSheet(false)}
+        onSaved={(b) => {
+          setUpSheet(false);
+          setBlock(b);
+          toast(b.capUp ? '캡이 하늘을 보는 자세(턴오버 후)로 계산해요' : '캡이 바닥을 보는 자세로 계산해요');
         }}
       />
       <CapSheet
@@ -292,9 +336,24 @@ export function CapScreen(p: { blockId: string; capId: string }) {
           sub={
             <span class="num">
               δ {fmt(cap.delta, 2)}°{dirText && ` · ${dirText} 쪽으로 돌아간 캡`}
+              {g.shell != null && ` · 외판 ${fmt(g.shell, 1)}°`}
             </span>
           }
         />
+        {noShell && (
+          <div class="banner">
+            <IWarn />
+            <div>
+              <b>캡 자리 외판 기울기가 없어요</b>
+              <span class="muted">도면 δ 는 외판 위 각도라, 외판이 서 있으면 회전오차가 크게 틀려요. 지금은 외판이 누운 것으로 계산해요</span>
+              <div>
+                <button class="text-btn mt8" onClick={() => setEditing(true)}>
+                  외판 기울기 넣기
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         {faUnset && (
           <div class="banner">
             <IWarn />
@@ -311,7 +370,7 @@ export function CapScreen(p: { blockId: string; capId: string }) {
         )}
         <div class="section">
           <div class="card">
-            <BasisLine eff={eff} />
+            <BasisLine eff={eff} up={g.up} />
             <div class="stat-grid">
               <div class="stat">
                 <div class="k">정상 B · WEB 직각</div>
@@ -338,6 +397,11 @@ export function CapScreen(p: { blockId: string; capId: string }) {
               </div>
             </div>
             {aWeak && <div class="note">A는 회전판정 불가(참고) — 캡이 1° 돌아도 A가 {fmt(normal.dA, 2)}° 밖에 안 바뀌어요</div>}
+            {g.shell != null && (
+              <div class="note num">
+                외판이 {fmt(g.shell, 1)}° 라 캡 상판은 {fmt(normal.deltaCap, 2)}° 돌아간 것으로 계산해요 · 1°당 변화는 도면 δ 1°당
+              </div>
+            )}
           </div>
         </div>
         <div class="section-title">
@@ -373,7 +437,7 @@ export function CapScreen(p: { blockId: string; capId: string }) {
         normal={isB ? normal.thetaB : normal.thetaA}
         faDir={eff.faDir}
         weak={!isB && aWeak}
-        sensitive={isB && highSensitive(eff.ta, eff.fa, eff.faDir, cap.delta, cap.dir, s.rotTol)}
+        sensitive={isB && highSensitive(eff.ta, eff.fa, eff.faDir, cap.delta, cap.dir, s.rotTol, g)}
         onGuide={() => setGuide(true)}
         onDone={(r) => {
           const d = isB ? { ...draft, first: r } : { ...draft, second: r };
@@ -400,9 +464,11 @@ export function CapScreen(p: { blockId: string; capId: string }) {
       eff={eff}
       rA={rA}
       rB={rB}
+      g={g}
       onRetryB={() => setStage('B')}
       onEditCap={() => setEditing(true)}
       onEditFa={() => setFaSheet(true)}
+      onEditUp={() => setUpSheet(true)}
       onRetry={() => setStage('ready')}
       onSaved={() => clearDraft('cap', cap.id)}
     >
@@ -411,14 +477,19 @@ export function CapScreen(p: { blockId: string; capId: string }) {
   );
 }
 
-/** 정상값 카드 위 한 줄 : 어느 기준으로 계산했는지 */
-function BasisLine(p: { eff: Effective }) {
+/** 정상값 카드 위 한 줄 : 어느 기준 · 자세로 계산했는지 */
+function BasisLine(p: { eff: Effective; up?: boolean }) {
   return (
     <div class="basis-line num">
       <span>
-        {basisName(p.eff.basis)} 기준 · T.A {fmt(p.eff.ta, 2)}° · F.A {fmt(p.eff.fa, 2)}° {leanText(p.eff.faDir)}
+        {basisName(p.eff.basis)} 기준 · T.A {taText(p.eff, (v) => fmt(v, 2))} · F.A {fmt(p.eff.fa, 2)}° {leanText(p.eff.faDir)}
       </span>
-      {p.eff.basis === 'ref' && <span class="badge blue">현물</span>}
+      {(p.eff.basis === 'ref' || p.up) && (
+        <span class="badges">
+          {p.up && <span class="badge warn">턴오버 후</span>}
+          {p.eff.basis === 'ref' && <span class="badge blue">현물</span>}
+        </span>
+      )}
     </div>
   );
 }
@@ -475,7 +546,8 @@ function StepScreen(p: {
           <div>
             <b>높은 쪽 하나로 OK · NG 가 바뀌는 캡이에요</b>
             <span>
-              정상 B 가 {fmt(Math.abs(p.normal), 2)}° 로 거의 수평이에요. {m.manual ? '수평계 화살표로 어느 쪽이 높은지 꼭 보고 골라주세요' : '폰 머리 방향을 꼭 맞게 대고 재주세요'}
+              {Math.abs(p.normal) < 2 ? `정상 B 가 ${fmt(Math.abs(p.normal), 2)}° 로 거의 수평이에요. ` : ''}
+              {m.manual ? '수평계 화살표로 어느 쪽이 높은지 꼭 보고 골라주세요' : '폰 머리 방향을 꼭 맞게 대고 재주세요'}
             </span>
           </div>
         </div>
@@ -537,29 +609,38 @@ function ResultScreen(p: {
   eff: Effective;
   rA: Reading;
   rB: Reading;
+  g: CapGeom;
   onRetryB: () => void;
   onEditCap: () => void;
   onEditFa: () => void;
+  onEditUp: () => void;
   onRetry: () => void;
   onSaved: () => void;
   children: preact.ComponentChildren;
 }) {
   const s = useSettings();
-  const { block, cap, eff } = p;
+  const { block, cap, eff, g } = p;
   const capDir = capDirOf(cap.delta, cap.dir);
-  const normal = capNormalDir(eff.ta, eff.fa, eff.faDir, cap.delta, capDir);
   // 현장 기록(크기 + 높은 쪽) → 계산용 부호
   const measB = p.rB.high ? signedB(p.rB.v, p.rB.high, eff.faDir) : 0;
-  const measA = signedA(p.rA.v, normal.thetaA);
-  const r = useMemo(() => analyzeCapDir(eff.ta, eff.fa, eff.faDir, cap.delta, capDir, measA, measB), [eff.ta, eff.fa, eff.faDir, cap.delta, capDir, measA, measB]);
-  const flipped = useMemo(() => analyzeCapDir(eff.ta, eff.fa, eff.faDir, cap.delta, capDir, measA, -measB), [eff.ta, eff.fa, eff.faDir, cap.delta, capDir, measA, measB]);
-  // ① 캡 · F.A 방향 점검 (A 로) — 의심되면 판정을 보류한다
-  const dirS = dirSuspect(eff.ta, eff.fa, eff.faDir, cap.delta, capDir, p.rA.v);
+  // 계산은 capcalc 한 곳에서 — 실제 δ · 회전오차는 도면과 같은 외판 위 각도
+  const res = useMemo(
+    () => capResult({ ta: eff.ta, fa: eff.fa, faDir: eff.faDir, delta: cap.delta, capDir, g: { shell: g.shell, up: g.up } }, p.rA.v, measB, s),
+    [eff.ta, eff.fa, eff.faDir, cap.delta, capDir, g.shell, g.up, p.rA.v, measB, s],
+  );
+  const r = res.analysis;
+  const measA = res.fields.measA!;
+  const flipped = useMemo(
+    () => analyzeCapDir(eff.ta, eff.fa, eff.faDir, cap.delta, capDir, measA, -measB, { shell: g.shell, up: g.up }),
+    [eff.ta, eff.fa, eff.faDir, cap.delta, capDir, measA, measB, g.shell, g.up],
+  );
+  // ① 캡 · F.A 방향 · 턴오버 점검 (A 로) — 의심되면 판정을 보류한다
+  const dirS = dirSuspect(eff.ta, eff.fa, eff.faDir, cap.delta, capDir, p.rA.v, g);
   // ② 높은 쪽 : 판정을 가르는 캡이면 두 결과를 나란히, 아니면 반대가 훨씬 그럴듯할 때만
-  const sensitive = highSensitive(eff.ta, eff.fa, eff.faDir, cap.delta, capDir, s.rotTol);
+  const sensitive = highSensitive(eff.ta, eff.fa, eff.faDir, cap.delta, capDir, s.rotTol, g);
   const suspect = p.rB.high && !sensitive ? flipSuspect(r, flipped, s.rotTol) : null;
   // ③ A · B 를 바꿔 넣음 (A 는 보통 B 보다 훨씬 크다)
-  const swapped = Math.abs(normal.thetaA) > Math.abs(normal.thetaB) + 5 && p.rA.v < p.rB.v;
+  const swapped = Math.abs(r.thetaA) > Math.abs(r.thetaB) + 5 && p.rA.v < p.rB.v;
   const verdict = capVerdict(r.rotErr, s);
   const flipVerdict = capVerdict(flipped.rotErr, s);
   const lvl = verdictLevel(verdict);
@@ -590,30 +671,21 @@ function ResultScreen(p: {
   const save = async () => {
     setSaving(true);
     await saveRecord({
+      ...res.fields, // 정상값 · 실측 · 역산 · 외판 · 자세 · 계산 방식
       id: newId(),
       createdAt: Date.now(),
       blockId: block.id,
       ship: block.ship,
       block: block.block,
       ta: eff.ta,
+      taDesign: eff.taDesign,
       fa: eff.fa,
       faDir: eff.faDir,
       basis: eff.basis,
       mode: 'cap',
       capId: cap.id,
       capNo: cap.no,
-      delta: cap.delta,
-      dir: capDir,
-      normalA: r.thetaA,
-      normalB: r.thetaB,
-      measA,
-      measB,
       highB: p.rB.high,
-      errA: r.errA,
-      errB: r.errB,
-      deltaReal: r.deltaReal,
-      rotErr: r.rotErr,
-      aResid: r.aResid,
       verdict,
       memo: memo.trim(),
       photo: photo ?? undefined,
@@ -630,8 +702,8 @@ function ResultScreen(p: {
         {p.bar}
         <div class="alert-hero">
           <IWarn />
-          <h1>캡 방향이나 F.A 방향이 반대로 들어간 것 같아요</h1>
-          <p>그래서 판정을 보류했어요. 방향을 고치면 같은 측정값으로 다시 계산해요</p>
+          <h1>방향이 반대로 들어간 것 같아요</h1>
+          <p>그래서 판정을 보류했어요. 아래 셋 중 틀린 것을 고치면 같은 측정값으로 다시 계산해요</p>
         </div>
         <div class="section mt16">
           <div class="card dir-card">
@@ -656,7 +728,7 @@ function ResultScreen(p: {
           </div>
         </div>
         <div class="section-title">
-          <span>둘 중 틀린 쪽을 고쳐주세요</span>
+          <span>셋 중 틀린 쪽을 고쳐주세요</span>
         </div>
         <div class="list">
           <button class="row" onClick={p.onEditFa}>
@@ -674,6 +746,15 @@ function ResultScreen(p: {
               <div class="t2">
                 지금 {dirName(capDir)} 쪽 · δ {fmt(cap.delta, 2)}°
               </div>
+            </div>
+            <span class="chev">
+              <IChevron />
+            </span>
+          </button>
+          <button class="row" onClick={p.onEditUp}>
+            <div class="body">
+              <div class="t1">잴 때 지주캡이 보는 쪽</div>
+              <div class="t2">{g.up ? '지금 하늘 (턴오버 후)' : "지금 바닥 · 턴오버해서 쟀다면 '하늘'로"}</div>
             </div>
             <span class="chev">
               <IChevron />
@@ -712,6 +793,11 @@ function ResultScreen(p: {
             <p class="num">
               {rotText(r.rotErr, cap.delta, capDir)} · 실제 δ {fmt(r.deltaReal, d)}° (도면 {fmt(cap.delta, 2)}°)
             </p>
+            {g.shell != null && r.deltaRealCap != null && (
+              <p class="num">
+                외판 {fmt(g.shell, 1)}° · 캡 상판으로는 {fmt(r.deltaRealCap, d)}° (도면이면 {fmt(r.deltaCap, d)}°)
+              </p>
+            )}
           </>
         )}
         {verdict === '기준미정' && (
@@ -737,7 +823,7 @@ function ResultScreen(p: {
           <IWarn />
           <div>
             <b>높은 쪽이 맞는지 다시 재서 확인해주세요</b>
-            <span>이 캡은 B 가 거의 수평이라, 높은 쪽 하나로 결과가 정반대가 돼요</span>
+            <span>{Math.abs(r.thetaB) < 2 ? '이 캡은 B 가 거의 수평이라, 높은 쪽 하나로 결과가 정반대가 돼요' : '이 캡은 높은 쪽 하나로 OK · NG 가 바뀌어요'}</span>
             <div class="two-out num">
               <div class="on">
                 <span>기록대로 {dirName(highNow)} 높음</span>
@@ -796,7 +882,14 @@ function ResultScreen(p: {
             <div class="kv">
               <span class="k">계산 기준</span>
               <span class="v num">
-                {basisName(eff.basis)} · T.A {fmt(eff.ta, 2)}° · F.A {fmt(eff.fa, 2)}° {leanText(eff.faDir)}
+                {basisName(eff.basis)} · T.A {taText(eff, (v) => fmt(v, 2))} · F.A {fmt(eff.fa, 2)}° {leanText(eff.faDir)}
+              </span>
+            </div>
+            <div class="kv">
+              <span class="k">캡 자세 · 외판</span>
+              <span class="v num">
+                {g.up ? '하늘 (턴오버 후)' : '바닥'} ·{' '}
+                {g.shell != null ? `외판 ${fmt(g.shell, 1)}° → 상판 δ ${fmt(r.deltaCap, d)}°` : Math.abs(cap.delta) < 1e-9 ? 'δ 0 (외판 무관)' : '외판 기울기 없음'}
               </span>
             </div>
           </div>

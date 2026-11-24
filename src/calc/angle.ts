@@ -3,10 +3,14 @@
  * 모든 입력 · 출력은 도(°), 안에서만 라디안을 쓴다.
  *
  * 용어 (작업지시서 2장)
- *  T.A  횡단각 (Transversal Angle) : FRAME 방향 라인이 수평과 이루는 각
+ *  T.A  횡단각 (Transversal Angle) : FRAME 방향 라인이 수평과 이루는 각 (= 폰이 재는 실제 경사)
  *  F.A  FRAME각 (Frame Angle)      : FRAME 면이 연직에서 기운 각 (LONGL. 방향 라인 값)
- *  δ    지주캡 WEB 이 FRAME 기준으로 돌아간 각 (도면 캡취부각도)
+ *  δ    지주캡 WEB 이 FRAME 기준으로 돌아간 각 — 이 파일의 식에서는 '캡 상판(수평면)' 에서의 각
  *  s    회전 방향 : 선수 = +1, 선미 = −1
+ *
+ * 1.6.0 (2026-11-24 현장 분석) : 도면에서 오는 값은 식에 넣기 전에 바꾼다 (6 · 7번)
+ *  - 도면 캡취부각도의 δ 는 외판 면 위의 각도 → 캡 자리 외판 기울기로 상판 각도로 바꾼다
+ *  - 도면 T.A 는 단면도에서 본 회전각 → F.A 로 누운 만큼 실제 경사로 바꾼다
  */
 
 export type Dir = 1 | -1;
@@ -142,4 +146,44 @@ export function analyzeCap(
 /** 블록 입력 검증 : 0 < F.A ≤ T.A < 90 */
 export function blockAnglesLookRight(TA: number, FA: number): boolean {
   return FA > 0 && FA <= TA && TA < 90;
+}
+
+/**
+ * 6) 외판 기울기 보정 — 도면 δ(외판 면 위) ↔ 캡 상판 δ(수평면)
+ * 캡취부각도는 외판을 정면에서 본 그림이라, δ 는 외판에 그은 FR 선과 캡 중심선 사이 각이다.
+ * 캡 WEB 은 수직판이라 외판이 서 있을수록 외판 위에서는 덜 돌아간 것처럼 보인다 (문을 열어도 경첩 선은 세로).
+ * shell θ = 캡이 있는 FR 단면에서 외판 접선과 A/B 수평선 사이 각 (0 ≤ θ < 90). 캡 WEB 은 외판 물매 방향과 나란하다고 본다.
+ *   tan δ상판 = tan δ외판 / √(cos²θ − tan²δ외판 · sin²θ)
+ *   tan δ외판 = sin δ상판 / √(cos²δ상판 + tan²θ)
+ * δ외판 은 90° − θ 보다 작아야 한다 (그보다 크면 기하적으로 불가능 → NaN).
+ */
+export function capDeltaFromShell(delta: number, shell: number): number {
+  const t = Math.tan(delta * D2R);
+  const q = cos(shell) ** 2 - t * t * sin(shell) ** 2;
+  if (!(q > 0)) return NaN;
+  return Math.atan(t / Math.sqrt(q)) * R2D;
+}
+
+export function shellDeltaFromCap(deltaCap: number, shell: number): number {
+  return Math.atan(sin(deltaCap) / Math.sqrt(cos(deltaCap) ** 2 + Math.tan(shell * D2R) ** 2)) * R2D;
+}
+
+/** 외판 기울기 θ 에서 넣을 수 있는 도면 δ 의 끝 (미만) */
+export const maxShellDelta = (shell: number) => 90 - shell;
+
+/** 도면 δ 1° 가 캡 상판에서 몇 ° 인지 (dA · dB 를 도면 각도 1° 당으로 바꿀 때) */
+export function shellScale(delta: number, shell: number): number {
+  const h = 0.01;
+  return (capDeltaFromShell(delta + h, shell) - capDeltaFromShell(delta - h, shell)) / (2 * h);
+}
+
+/**
+ * 7) 도면 T.A → 실제 경사
+ * 도면 T.A 는 단면도(FRAME 면)에서 본 각이다. 그 FRAME 면이 F.A 만큼 누우면 같은 선이 덜 가팔라진다.
+ *   sin(경사) = sin T.A · cos F.A
+ * (2026-11-24 현장 : F.A 가 큰 블록 두 곳에서 이렇게 바꾸면 현물 T.A 와 0.4° 안, 안 바꾸면 0.7~1.2° 차이)
+ * 현물 T.A 는 폰이 경사를 바로 재므로 바꾸지 않는다.
+ */
+export function taSlope(TA: number, FA: number): number {
+  return asinDeg(sin(TA) * cos(FA));
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { thetaA, thetaB, type Dir } from './angle';
+import { taSlope, thetaA, thetaB, type Dir } from './angle';
 import { buildReport, reportFileName, spanText } from './report';
 import { analyzeCapDir, calcDir, capDirOf, capNormalDir, highOfB } from './sign';
 import type { Block, Cap, MeasureRecord } from '../db/store';
@@ -56,9 +56,10 @@ describe('지주캡 보고서 정리', () => {
     expect(r.rows[0].rotText).toBe('선미 쪽으로 0.50° 덜 돌아감');
   });
 
-  it('도면 · 현물 비교와 A 일치 확인', () => {
+  it('도면 · 현물 비교와 A 일치 확인 (T.A 는 도면을 경사로 바꿔 비교)', () => {
     const r = buildReport(block, [c1], [rec(c1, 0.2, t0)], settings);
-    expect(r.taDiff).toBeCloseTo(0.2, 9);
+    expect(r.design?.slope).toBeCloseTo(taSlope(TA, FA), 9);
+    expect(r.taDiff).toBeCloseTo(Math.abs(taSlope(TA, FA) - 10.2), 9);
     expect(r.faDiff).toBeCloseTo(0.1, 9);
     expect(r.faDirSame).toBe(true);
     expect(r.aOk).toBe(true);

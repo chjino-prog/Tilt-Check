@@ -12,7 +12,7 @@ import { BlockSheet } from './edit-sheets';
 function angleText(b: Block): string {
   const e = effectiveAngles(b);
   if (!e) return 'T.A · F.A 미입력';
-  return `T.A ${fmt(e.ta, 2)}° · F.A ${fmt(e.fa, 2)}°${e.basis === 'ref' ? ' (현물)' : ''}`;
+  return `T.A ${fmt(e.taDesign ?? e.ta, 2)}° · F.A ${fmt(e.fa, 2)}°${e.basis === 'ref' ? ' (현물)' : ''}`; // 목록은 도면에 적힌 값 그대로
 }
 
 export function HomeScreen() {

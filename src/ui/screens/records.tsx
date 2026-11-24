@@ -3,11 +3,12 @@ import { useEffect, useMemo, useState } from 'preact/hooks';
 import { bText, dirName, leanText, rotText } from '../../calc/sign';
 import { capDirText, fmt, fmtDate, fmtSigned, isLegacyCap, sameSignWarning, verdictLevel } from '../../calc/judge';
 import { canShareFile, downloadCsv, shareCsv } from '../../calc/csv';
-import { deleteRecord, getBlock, listBlocks, listRecords, listRecordsByBlock, type Block, type MeasureRecord } from '../../db/store';
+import { recalcCapRecord } from '../../calc/capcalc';
+import { deleteRecord, getBlock, getCap, listBlocks, listRecords, listRecordsByBlock, saveRecord, type Block, type Cap, type MeasureRecord } from '../../db/store';
 import { useSettings } from '../../settings';
 import { go } from '../router';
 import { BrandBar, ConfirmSheet, Cta, Empty, Headline, MenuRow, Seg, Sheet, TopBar, toast } from '../components/ui';
-import { IChevron, IDownload, IShare, ITabRecord, IWarn } from '../icons';
+import { IChevron, IDownload, IInfo, IShare, ITabRecord, IWarn } from '../icons';
 import { SameSignBanner } from './block';
 
 const today = () => new Date().toISOString().slice(0, 10).replace(/-/g, '');
@@ -226,7 +227,15 @@ export function BlockRecordsScreen(p: { blockId: string }) {
         </Cta>
       )}
 
-      <RecordSheet record={open} onClose={() => setOpen(null)} onDelete={() => setConfirmDel(true)} />
+      <RecordSheet
+        record={open}
+        onClose={() => setOpen(null)}
+        onDelete={() => setConfirmDel(true)}
+        onRecalc={(next) => {
+          setOpen(next);
+          load();
+        }}
+      />
       <ConfirmSheet
         open={confirmDel}
         title="이 기록을 지울까요?"
@@ -246,16 +255,29 @@ export function BlockRecordsScreen(p: { blockId: string }) {
   );
 }
 
-function RecordSheet(p: { record: MeasureRecord | null; onClose: () => void; onDelete: () => void }) {
+function RecordSheet(p: { record: MeasureRecord | null; onClose: () => void; onDelete: () => void; onRecalc: (next: MeasureRecord) => void }) {
   const r = p.record;
+  const s = useSettings();
   const [url, setUrl] = useState<string | null>(null);
+  const [ctx, setCtx] = useState<{ cap?: Cap; block?: Block } | null>(null);
+  const [busy, setBusy] = useState(false);
   useEffect(() => {
     if (!r?.photo) return setUrl(null);
     const u = URL.createObjectURL(r.photo);
     setUrl(u);
     return () => URL.revokeObjectURL(u);
   }, [r]);
+  // 다시 계산할 때 쓸 지금 캡(외판 기울기) · 블록(턴오버)
+  useEffect(() => {
+    setCtx(null);
+    if (!r || r.mode !== 'cap') return;
+    let alive = true;
+    Promise.all([r.capId ? getCap(r.capId) : Promise.resolve(undefined), getBlock(r.blockId)]).then(([cap, block]) => alive && setCtx({ cap, block }));
+    return () => void (alive = false);
+  }, [r?.id, r?.recalcAt]);
   if (!r) return null;
+  const re = ctx ? recalcCapRecord(r, ctx.cap, ctx.block, s) : null;
+  const offer = re && re.changed && !re.suspect ? re.next : null;
   const kv = (k: string, v: string) => (
     <div class="kv">
       <span class="k">{k}</span>
@@ -278,12 +300,56 @@ function RecordSheet(p: { record: MeasureRecord | null; onClose: () => void; onD
           </div>
         </div>
       )}
+      {offer && (
+        <div class="banner info">
+          <IInfo />
+          <div>
+            <b>새 계산으로 다시 계산할 수 있어요</b>
+            <span class="muted num">
+              {[
+                ctx?.cap?.shell != null && Math.abs(r.delta ?? 0) >= 1e-9 ? `외판 ${fmt(ctx.cap.shell, 1)}°` : null,
+                ctx?.block?.capUp ? '턴오버 후' : null,
+                r.basis !== 'ref' && !r.calcRev ? '도면 T.A 경사' : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}{' '}
+              반영 → 회전오차 {f(offer.rotErr)} · {offer.verdict} (지금 {f(r.rotErr)} · {r.verdict}). 잰 값은 그대로예요
+            </span>
+            <div>
+              <button
+                class="btn small dark mt8"
+                disabled={busy}
+                onClick={async () => {
+                  setBusy(true);
+                  await saveRecord(offer);
+                  setBusy(false);
+                  toast('새 계산으로 다시 계산했어요');
+                  p.onRecalc(offer);
+                }}
+              >
+                다시 계산해서 저장
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {re?.suspect && re.changed && (
+        <div class="banner">
+          <IWarn />
+          <div>
+            <b>지금 조건으로는 방향이 반대로 보여요</b>
+            <span class="muted">블록의 '잴 때 지주캡이 보는 쪽' · FRAME 누운 쪽 · 캡 방향을 확인해주세요</span>
+          </div>
+        </div>
+      )}
       {r.mode === 'cap' ? (
         <>
           <div class="kv-group">
             {kv('δ (도면)', `${fmt(r.delta, 2)}° ${capDirText(r.delta, r.dir)}`.trim())}
-            {kv('실제 δ', r.deltaReal == null ? '—' : fmt(r.deltaReal, 2) + '°')}
+            {r.shell != null && kv('캡 자리 외판', `${fmt(r.shell, 1)}° → 상판 δ ${fmt(r.deltaCap, 2)}°`)}
+            {kv('실제 δ', r.deltaReal == null ? '—' : fmt(r.deltaReal, 2) + '°' + (r.shell != null && r.deltaRealCap != null ? ` (상판 ${fmt(r.deltaRealCap, 2)}°)` : ''))}
             {kv('회전오차', isLegacyCap(r) ? f(r.rotErr) : `${f(r.rotErr)} · ${rotText(r.rotErr, r.delta ?? 0, r.dir ?? 1)}`)}
+            {r.calcRev != null && kv('캡 자세', r.up ? '하늘 (턴오버 후)' : '바닥')}
           </div>
           <div class="kv-group">
             {kv('F.A', isLegacyCap(r) ? `${fmt(r.fa, 2)}° (방향 기록 없음)` : `${fmt(r.fa, 2)}° · ${leanText(r.faDir ?? 1)}`)}
@@ -301,7 +367,13 @@ function RecordSheet(p: { record: MeasureRecord | null; onClose: () => void; onD
         </div>
       )}
       <div class="kv-group">
-        {kv('계산 기준', `${r.basis === 'ref' ? '현물' : '도면'} · T.A ${fmt(r.ta, 2)}° · F.A ${fmt(r.fa, 2)}°`)}
+        {kv(
+          '계산 기준',
+          `${r.basis === 'ref' ? '현물' : '도면'} · T.A ${r.taDesign != null && Math.abs(r.taDesign - r.ta) >= 0.005 ? `${fmt(r.taDesign, 2)}°(경사 ${fmt(r.ta, 2)}°)` : fmt(r.ta, 2) + '°'} · F.A ${fmt(r.fa, 2)}°`,
+        )}
+        {r.mode === 'cap' &&
+          !isLegacyCap(r) &&
+          kv('계산 방식', r.calcRev ? `1.6.0${r.recalcAt ? ` · ${fmtDate(r.recalcAt).slice(5)} 다시 계산` : ''}` : '1.6.0 전 (외판 · 턴오버 반영 안 됨)')}
       </div>
       {r.memo && (
         <div class="kv-group">

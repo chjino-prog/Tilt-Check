@@ -7,7 +7,7 @@
  *  - 판정은 지금 설정의 허용 회전오차로 다시 매긴다 (보고서에 적힌 허용값과 맞게).
  */
 import type { Dir } from './angle';
-import { basisName, effectiveAngles, hasDesign, hasRef, type Basis } from './basis';
+import { basisName, designSlope, effectiveAngles, hasDesign, hasRef, type Basis } from './basis';
 import { capVerdict, isLegacyCap, latestPerCap, sameSignWarning } from './judge';
 import { capDirOf, dirSuspect, highOfB, rotText, rotToBow } from './sign';
 import type { Block, Cap, MeasureRecord, Verdict } from '../db/store';
@@ -28,13 +28,17 @@ export interface ReportRow {
   rotText?: string; // '선수 쪽으로 0.35° 돌아감'
   verdict?: Verdict;
   dirWarn?: boolean; // 캡 · F.A 방향이 반대로 들어간 것 같음
+  shell?: number; // 계산에 쓴 캡 자리 외판 기울기
+  noShell?: boolean; // δ 가 있는데 외판 기울기 없이 계산한 기록
+  up?: boolean; // 턴오버 후(캡이 하늘을 봄)에 잰 기록
   at?: number;
 }
 
 export interface AnglePair {
-  ta: number;
+  ta: number; // 도면이면 도면에 적힌 값, 현물이면 폰이 잰 경사
   fa: number;
   faDir?: Dir;
+  slope?: number; // 도면 T.A 를 실제 경사로 바꾼 값 (도면만)
 }
 
 export interface Report {
@@ -59,6 +63,8 @@ export interface Report {
   aMaxDiff: number | null; // max |A 실측 − 정상|
   aOk: boolean | null; // A 가 정상값과 다 맞는가 (A 잔차 경고 기준 안)
   dirWarnCaps: string[];
+  noShellCaps: string[]; // δ 가 있는데 외판 기울기 없이 계산한 캡
+  turned: boolean; // 턴오버 후(캡이 하늘을 봄)에 잰 기록이 있음
   sameSign: { warn: boolean; sign: number };
   skippedLegacy: number;
 }
@@ -81,8 +87,9 @@ export function buildReport(block: Block, caps: Cap[], records: MeasureRecord[],
     const delta = r.delta ?? c.delta;
     const dir = capDirOf(delta, r.dir ?? c.dir);
     const rot = r.rotErr ?? null;
+    const g = { shell: r.shell, up: r.up }; // 그 기록을 계산한 조건 그대로
     const dw =
-      r.measA != null && r.ta != null && r.fa != null ? dirSuspect(r.ta, r.fa, faDir, delta, r.dir ?? c.dir, r.measA) != null : false;
+      r.measA != null && r.ta != null && r.fa != null ? dirSuspect(r.ta, r.fa, faDir, delta, r.dir ?? c.dir, r.measA, g) != null : false;
     return {
       capNo: r.capNo ?? c.no,
       delta,
@@ -98,6 +105,9 @@ export function buildReport(block: Block, caps: Cap[], records: MeasureRecord[],
       rotText: rot == null ? '역산 불가' : rotText(rot, delta, dir),
       verdict: dw ? '판정불가' : capVerdict(rot, s),
       dirWarn: dw,
+      shell: r.shell,
+      noShell: Math.abs(delta) >= 1e-9 && r.shell == null,
+      up: r.up,
       at: r.createdAt,
     };
   });
@@ -109,7 +119,9 @@ export function buildReport(block: Block, caps: Cap[], records: MeasureRecord[],
   const aDiffs = m.filter((r) => r.measA != null && r.normalA != null).map((r) => Math.abs(Math.abs(r.measA!) - Math.abs(r.normalA!)));
   const aMaxDiff = aDiffs.length ? Math.max(...aDiffs) : null;
 
-  const design = hasDesign(block) ? { ta: Math.abs(block.ta!), fa: Math.abs(block.fa!), faDir: block.faDir } : null;
+  const design = hasDesign(block)
+    ? { ta: Math.abs(block.ta!), fa: Math.abs(block.fa!), faDir: block.faDir, slope: designSlope(block.ta!, block.fa!) }
+    : null;
   const ref = hasRef(block) ? { ta: Math.abs(block.refTa!), fa: Math.abs(block.refFa!), faDir: block.refFaDir } : null;
   // 보고서 기준 = 표에 쓴 기록들이 쓴 기준 (최근 기록 우선), 기록이 없으면 블록의 지금 기준
   const lastRec = [...latest.values()].sort((a, b) => b.createdAt - a.createdAt)[0];
@@ -124,7 +136,7 @@ export function buildReport(block: Block, caps: Cap[], records: MeasureRecord[],
     basis,
     design,
     ref,
-    taDiff: design && ref ? Math.abs(design.ta - ref.ta) : null,
+    taDiff: design && ref ? Math.abs(design.slope - ref.ta) : null, // 현물은 경사를 재므로 도면도 경사로 비교
     faDiff: design && ref ? Math.abs(design.fa - ref.fa) : null,
     faDirSame: design?.faDir != null && ref?.faDir != null ? design.faDir === ref.faDir : null,
     rows,
@@ -138,6 +150,8 @@ export function buildReport(block: Block, caps: Cap[], records: MeasureRecord[],
     aMaxDiff,
     aOk: aMaxDiff == null ? null : aMaxDiff <= s.aResidTol + 1e-9 && !m.some((r) => r.dirWarn),
     dirWarnCaps: m.filter((r) => r.dirWarn).map((r) => r.capNo),
+    noShellCaps: m.filter((r) => r.noShell).map((r) => r.capNo),
+    turned: m.some((r) => r.up),
     sameSign: { warn: ss.warn, sign: ss.sign },
     skippedLegacy: legacy.length,
   };

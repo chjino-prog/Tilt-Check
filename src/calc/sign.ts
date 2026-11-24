@@ -12,15 +12,57 @@
  * 2) B 부호 : F.A 방향 쪽 끝이 낮다. 즉 TS캡(δ=0) · LONGL. 라인은 F.A 반대쪽이 높다.
  *    (2026-11-21 현장 확인 : F.A 선미 블록 → TS11 · TS12 · DECK LONGL. 모두 선수 쪽이 높음)
  *    → 그 쪽(F.A 반대쪽)이 높으면 B = +, F.A 쪽이 높으면 B = −.
+ *
+ * 4) 턴오버 : 도면의 '돌아간 방향' 은 캡 WEB 의 외판 쪽(바깥) 끝이 가는 쪽이다.
+ *    캡이 바닥을 보는 보통 자세에서는 그 끝이 낮은 끝이라 1) 규칙 그대로다.
+ *    블록을 턴오버해 캡이 하늘을 보면 그 끝이 높은 끝이 되므로 s 를 뒤집는다 (선수 · 선미는 그대로).
+ *    (2026-11-24 현장 : 턴오버 후 잰 PSA 캡 3개가 뒤집지 않으면 '방향 반대' 로 보류, 뒤집으면 맞음)
+ *
+ * 5) 외판 기울기 (angle.ts 6번) : 도면 δ 는 외판 면 위 각도라, 계산식에는 캡 상판 각도로 바꿔 넣고
+ *    실제 δ · 회전오차 · dA · dB 는 다시 도면과 같은 외판 위 각도로 돌려준다. δ 0 캡은 바꾸지 않는다.
  */
-import { analyzeCap, capNormal, inverseDelta, thetaA, type CapAnalysis, type CapNormal, type Dir } from './angle';
+import {
+  analyzeCap,
+  capDeltaFromShell,
+  capNormal,
+  normDeg,
+  shellDeltaFromCap,
+  shellScale,
+  thetaA,
+  type CapAnalysis,
+  type CapNormal,
+  type Dir,
+} from './angle';
 import { fmt } from './judge';
 
 export const dirName = (d: Dir) => (d === 1 ? '선수' : '선미');
 
-/** 계산식에 넣는 회전 부호 s */
-export function calcDir(capDir: Dir, faDir: Dir): Dir {
-  return (capDir * faDir) as Dir;
+/** 캡 계산 조건 — 잴 때 블록 자세 · 캡 자리 외판 */
+export interface CapGeom {
+  /** 캡 자리 외판 기울기 θ (FR 단면에서 외판 접선과 A/B 수평선 사이, 0~90). 없으면 δ 그대로 */
+  shell?: number | null;
+  /** 턴오버 후 — 캡이 하늘을 보는 자세에서 잼 */
+  up?: boolean;
+}
+
+/** 계산식에 넣는 회전 부호 s (턴오버 후면 뒤집는다) */
+export function calcDir(capDir: Dir, faDir: Dir, up = false): Dir {
+  return (capDir * faDir * (up ? -1 : 1)) as Dir;
+}
+
+/** 외판 보정을 쓰는가 — δ 가 있고 외판 기울기가 0 보다 클 때 */
+export function usesShell(delta: number, g?: CapGeom): g is CapGeom & { shell: number } {
+  return Math.abs(delta) >= 1e-9 && g?.shell != null && isFinite(g.shell) && g.shell > 0;
+}
+
+/** 계산식에 넣을 캡 상판 δ (외판 기울기가 없거나 δ 0 이면 그대로) */
+export function capDelta(delta: number, g?: CapGeom): number {
+  return usesShell(delta, g) ? capDeltaFromShell(delta, g.shell) : delta;
+}
+
+/** 외판 기울기 θ 에서 도면 δ 가 가능한 값인가 (δ < 90° − θ) */
+export function shellDeltaOk(delta: number, shell: number | null | undefined): boolean {
+  return shell == null || Math.abs(delta) < 1e-9 || isFinite(capDeltaFromShell(delta, shell));
 }
 
 /**
@@ -66,14 +108,41 @@ export function signedA(mag: number, normalA: number): number {
   return normalA < 0 ? -Math.abs(mag) : Math.abs(mag);
 }
 
-/** 방향을 반영한 정상값 */
-export function capNormalDir(ta: number, fa: number, faDir: Dir, delta: number, capDir: Dir): CapNormal {
-  return capNormal(ta, fa, delta, calcDir(capDirOf(delta, capDir), faDir));
+export interface CapNormalDir extends CapNormal {
+  deltaCap: number; // 계산에 쓴 캡 상판 δ
 }
 
-/** 방향을 반영한 역산 · 잔차. measB 는 signedB 로 부호를 붙인 값 */
-export function analyzeCapDir(ta: number, fa: number, faDir: Dir, delta: number, capDir: Dir, measA: number, measB: number): CapAnalysis {
-  return analyzeCap(ta, fa, delta, calcDir(capDirOf(delta, capDir), faDir), measA, measB);
+export interface CapAnalysisDir extends CapAnalysis {
+  deltaCap: number; // 계산에 쓴 캡 상판 δ
+  deltaRealCap: number | null; // B 로 역산한 실제 상판 δ
+}
+
+/** 방향 · 자세 · 외판 기울기를 반영한 정상값. dA · dB 는 도면 δ 1° 당 */
+export function capNormalDir(ta: number, fa: number, faDir: Dir, delta: number, capDir: Dir, g?: CapGeom): CapNormalDir {
+  const dc = capDelta(delta, g);
+  const n = capNormal(ta, fa, dc, calcDir(capDirOf(delta, capDir), faDir, g?.up));
+  const k = usesShell(delta, g) ? shellScale(delta, g.shell) : 1;
+  return { ...n, dA: n.dA * k, dB: n.dB * k, deltaCap: dc };
+}
+
+/**
+ * 방향 · 자세 · 외판 기울기를 반영한 역산 · 잔차. measB 는 signedB 로 부호를 붙인 값.
+ * 실제 δ · 회전오차는 도면과 같은 외판 위 각도로 돌려준다 (판정도 이 값으로).
+ */
+export function analyzeCapDir(ta: number, fa: number, faDir: Dir, delta: number, capDir: Dir, measA: number, measB: number, g?: CapGeom): CapAnalysisDir {
+  const dc = capDelta(delta, g);
+  const a = analyzeCap(ta, fa, dc, calcDir(capDirOf(delta, capDir), faDir, g?.up), measA, measB);
+  const out: CapAnalysisDir = { ...a, deltaCap: dc, deltaRealCap: a.deltaReal };
+  if (usesShell(delta, g)) {
+    const k = shellScale(delta, g.shell);
+    out.dA = a.dA * k;
+    out.dB = a.dB * k;
+    if (a.deltaReal != null && Math.abs(a.deltaReal) < 90) {
+      out.deltaReal = shellDeltaFromCap(a.deltaReal, g.shell);
+      out.rotErr = normDeg(out.deltaReal - delta);
+    }
+  }
+  return out;
 }
 
 /**
@@ -104,11 +173,11 @@ export const rotLimit = (tol: number | null | undefined) => Math.max(tol ?? 2, 1
  * 높은 쪽이 판정을 가르는 캡인가 — 정상 B 를 반대쪽으로 넣었을 때의 회전오차가 작으면,
  * 높은 쪽 착오가 '그럴듯한 회전오차'로 보여 걸러낼 수 없다 (PSA 캡처럼 정상 B 가 거의 수평).
  */
-export function highSensitive(ta: number, fa: number, faDir: Dir, delta: number, capDir: Dir, tol: number | null | undefined): boolean {
-  const n = capNormalDir(ta, fa, faDir, delta, capDir);
+export function highSensitive(ta: number, fa: number, faDir: Dir, delta: number, capDir: Dir, tol: number | null | undefined, g?: CapGeom): boolean {
+  const n = capNormalDir(ta, fa, faDir, delta, capDir, g);
   if (Math.abs(n.thetaB) < 0.005) return true;
-  const inv = inverseDelta(ta, fa, delta, calcDir(capDirOf(delta, capDir), faDir), -n.thetaB);
-  return !inv.ok || Math.abs(inv.rotErr) <= 2.5 * rotLimit(tol);
+  const inv = analyzeCapDir(ta, fa, faDir, delta, capDir, n.thetaA, -n.thetaB, g);
+  return inv.rotErr == null || Math.abs(inv.rotErr) <= 2.5 * rotLimit(tol);
 }
 
 export interface DirSuspect {
@@ -117,14 +186,15 @@ export interface DirSuspect {
 }
 
 /**
- * 캡 방향 · F.A 방향 점검 — A 는 캡이 돌아도 거의 안 바뀌고(dA 작음) 방향에는 크게 바뀐다.
+ * 캡 방향 · F.A 방향 · 턴오버 점검 — A 는 캡이 돌아도 거의 안 바뀌고(dA 작음) 방향에는 크게 바뀐다.
  * 실측 A 가 '반대 방향 정상 A' 에 뚜렷이 더 가까우면 방향이 반대로 들어간 것으로 본다.
  * (2026-11-21 현장 : 예전 식 정상 A 33.64 · 실측 34.6 · 바른 방향 34.59 — 사람이 찾아낸 착오를 앱이 잡게)
  */
-export function dirSuspect(ta: number, fa: number, faDir: Dir, delta: number, capDir: Dir, measA: number): DirSuspect | null {
-  const s = calcDir(capDirOf(delta, capDir), faDir);
-  const aNow = thetaA(ta, fa, delta, s);
-  const aFlip = thetaA(ta, fa, delta, (-s) as Dir);
+export function dirSuspect(ta: number, fa: number, faDir: Dir, delta: number, capDir: Dir, measA: number, g?: CapGeom): DirSuspect | null {
+  const s = calcDir(capDirOf(delta, capDir), faDir, g?.up);
+  const dc = capDelta(delta, g);
+  const aNow = thetaA(ta, fa, dc, s);
+  const aFlip = thetaA(ta, fa, dc, (-s) as Dir);
   const m = Math.abs(measA);
   if (!isFinite(m) || Math.abs(aNow - aFlip) < 0.4) return null; // 방향에 따른 차이가 작으면 가를 수 없음
   return Math.abs(m - Math.abs(aFlip)) + 0.3 < Math.abs(m - Math.abs(aNow)) ? { aNow, aFlip } : null;
