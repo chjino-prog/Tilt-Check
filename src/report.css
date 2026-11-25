@@ -549,3 +549,20 @@
     break-inside: avoid;
   }
 }
+/* 1.7.0 : 주의 판정 · A·B 편차 */
+.rpt-pill.warn {
+  background: var(--r-orange-bg);
+  color: var(--r-orange);
+  border-color: var(--r-orange);
+}
+.rpt-res .rot.warn {
+  color: var(--r-orange);
+}
+.rpt-res .dev {
+  font-family: var(--fB);
+  font-weight: 700;
+  margin-left: 2px;
+}
+.rpt-res tr.isng .dev {
+  color: var(--r-red);
+}

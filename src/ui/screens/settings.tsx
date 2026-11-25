@@ -7,19 +7,18 @@ import { back, go } from '../router';
 import { BrandBar, ConfirmSheet, Cta, Headline, NumInput, Seg, Sheet, Toggle, TopBar, toast } from '../components/ui';
 import { IChevron, IWarnFill } from '../icons';
 
-type NumKey = 'tol1' | 'tol2' | 'rotTol' | 'aResidTol' | 'aSensMin';
+type NumKey = 'tol1' | 'tol2' | 'capTol' | 'aResidTol' | 'aSensMin';
 
-const NUM_META: Record<NumKey, { label: string; sub: string; unit: string; allowEmpty?: boolean }> = {
+const NUM_META: Record<NumKey, { label: string; sub: string; unit: string; step?: number }> = {
   tol1: { label: '일반 편차 1단계', sub: '편차가 이 값 이하면 녹색(양호)이에요', unit: '°' },
   tol2: { label: '일반 편차 2단계', sub: '1단계 초과 ~ 이 값 이하면 주황(주의), 넘으면 빨강이에요', unit: '°' },
-  rotTol: { label: '허용 회전오차', sub: '지주캡 OK / NG 판정 기준이에요. 비워두면 ‘기준미정’으로 표시해요', unit: '°', allowEmpty: true },
+  capTol: { label: '합격 허용오차', sub: '지주캡 A · B 편차가 이 값 이하면 OK, 넘으면 NG 예요. 역산 회전각이 이 값을 넘으면 ‘주의’로 알려요. 0.1° 단위', unit: '°', step: 0.1 },
   aResidTol: { label: 'A 잔차 경고', sub: 'A 잔차가 이 값을 넘으면 재측정을 권해요', unit: '°' },
   aSensMin: { label: 'A 민감도 하한', sub: 'dA 가 이 값보다 작으면 A 는 참고로만 봐요', unit: '°/°' },
 };
 
 function valText(s: Settings, k: NumKey): string {
   const v = s[k];
-  if (v == null) return '기준미정';
   return (k === 'aSensMin' ? '' : '±') + String(Number(v.toFixed(2))) + NUM_META[k].unit;
 }
 
@@ -34,7 +33,7 @@ export function SettingsScreen() {
 
   const val = parseNum(text);
   const meta = edit ? NUM_META[edit] : null;
-  const ok = edit != null && ((meta!.allowEmpty && text.trim() === '') || (val != null && val >= 0));
+  const ok = edit != null && val != null && (edit === 'capTol' ? Math.abs(val) >= 0.1 : val >= 0);
 
   const row = (k: NumKey) => (
     <button class="row compact" onClick={() => setEdit(k)}>
@@ -44,7 +43,7 @@ export function SettingsScreen() {
         </div>
       </div>
       <div class="tail">
-        <span class="value num" style={k === 'rotTol' && s.rotTol == null ? { color: 'var(--text-3)' } : undefined}>
+        <span class="value num">
           {valText(s, k)}
         </span>
         <span class="chev">
@@ -63,7 +62,7 @@ export function SettingsScreen() {
         <span>판정 기준</span>
       </div>
       <div class="list">
-        {row('rotTol')}
+        {row('capTol')}
         {row('aResidTol')}
         {row('aSensMin')}
         {row('tol1')}
@@ -182,7 +181,7 @@ export function SettingsScreen() {
           <>
             <h2>{meta.label}</h2>
             <p class="sub">{meta.sub}</p>
-            <NumInput value={text} onInput={setText} placeholder={meta.allowEmpty ? '비워두면 기준미정' : '0.0'} unit={meta.unit} autoFocus />
+            <NumInput value={text} onInput={setText} placeholder="0.0" unit={meta.unit} autoFocus />
             <div class="actions mt16">
               <button class="btn grey" onClick={() => setEdit(null)}>
                 닫기
@@ -191,7 +190,8 @@ export function SettingsScreen() {
                 class="btn"
                 disabled={!ok}
                 onClick={() => {
-                  setSettings({ [edit!]: text.trim() === '' ? null : Math.abs(val!) } as Partial<Settings>);
+                  const v = Math.abs(val!);
+                  setSettings({ [edit!]: meta!.step ? Number((Math.round(v / meta!.step) * meta!.step).toFixed(1)) : v } as Partial<Settings>);
                   setEdit(null);
                   toast('저장했어요');
                 }}

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'preact/hooks';
 import { bText, dirName, leanText, rotText } from '../../calc/sign';
 import { capDirText, fmt, fmtDate, fmtSigned, isLegacyCap, sameSignWarning, verdictLevel } from '../../calc/judge';
 import { canShareFile, downloadCsv, shareCsv } from '../../calc/csv';
-import { recalcCapRecord } from '../../calc/capcalc';
+import { CALC_REV, calcRevName, recalcCapRecord } from '../../calc/capcalc';
 import { deleteRecord, getBlock, getCap, listBlocks, listRecords, listRecordsByBlock, saveRecord, type Block, type Cap, type MeasureRecord } from '../../db/store';
 import { useSettings } from '../../settings';
 import { go } from '../router';
@@ -128,8 +128,9 @@ type Filter = 'all' | 'cap' | 'line';
 function summary(r: MeasureRecord, d: number): string {
   if (r.mode === 'cap') {
     if (isLegacyCap(r)) return `1.2.0 전 계산 방식 · 회전오차 ${fmtSigned(r.rotErr, 2)}°`;
-    if (r.rotErr == null) return `B ${bText(r.measB, r.faDir ?? 1)} · 역산 불가`;
-    return `${rotText(r.rotErr, r.delta ?? 0, r.dir ?? 1)} · A잔차 ${fmtSigned(r.aResid, 2)}°`;
+    // 1.7.0 : 판정 기준인 A · B 편차를 앞에, 역산 회전은 뒤에 참고로
+    const rot = r.rotErr == null ? '역산 불가' : `회전 ${fmtSigned(r.rotErr, 2)}°`;
+    return `B ${fmtSigned(r.errB, 2)}° · A ${fmtSigned(r.errA, 2)}° · ${rot}`;
   }
   return `실측 ${fmt(Math.abs(r.meas ?? NaN), d)}° · 편차 ${fmtSigned(r.dev, d)}°`;
 }
@@ -310,10 +311,11 @@ function RecordSheet(p: { record: MeasureRecord | null; onClose: () => void; onD
                 ctx?.cap?.shell != null && Math.abs(r.delta ?? 0) >= 1e-9 ? `외판 ${fmt(ctx.cap.shell, 1)}°` : null,
                 ctx?.block?.capUp ? '턴오버 후' : null,
                 r.basis !== 'ref' && !r.calcRev ? '도면 T.A 경사' : null,
+                (r.calcRev ?? 0) < CALC_REV ? '1.7.0 판정(A · B 비교)' : null,
               ]
                 .filter(Boolean)
                 .join(' · ')}{' '}
-              반영 → 회전오차 {f(offer.rotErr)} · {offer.verdict} (지금 {f(r.rotErr)} · {r.verdict}). 잰 값은 그대로예요
+              반영 → {offer.verdict} · B 편차 {f(offer.errB)} (지금 {r.verdict}). 잰 값은 그대로예요
             </span>
             <div>
               <button
@@ -344,19 +346,34 @@ function RecordSheet(p: { record: MeasureRecord | null; onClose: () => void; onD
       )}
       {r.mode === 'cap' ? (
         <>
+          {r.caution && (
+            <div class="banner">
+              <IWarn />
+              <div>
+                <b>주의 사유</b>
+                <span class="muted">{r.caution}</span>
+              </div>
+            </div>
+          )}
+          <div class="kv-group">
+            {kv('B 실측', isLegacyCap(r) ? `${fmtSigned(r.measB, 2)}° (높은 쪽 기록 없음)` : bText(r.measB, r.faDir ?? 1))}
+            {kv('B 정상', isLegacyCap(r) ? `${fmtSigned(r.normalB, 2)}°` : bText(r.normalB, r.faDir ?? 1))}
+            {kv('B 편차', f(r.errB))}
+            {kv('A 실측 / 정상', `${fmt(r.measA, 2)}° / ${fmt(r.normalA, 2)}°`)}
+            {kv('A 편차', f(r.errA))}
+            {r.tol != null && kv('합격 허용오차', `±${fmt(r.tol, 1)}° (그때 설정)`)}
+          </div>
+          <div class="kv-group">
+            {kv('역산 회전 (참고)', isLegacyCap(r) ? f(r.rotErr) : r.rotErr == null ? '역산 불가' : `${f(r.rotErr)} · ${rotText(r.rotErr, r.delta ?? 0, r.dir ?? 1)}`)}
+            {kv('실제 δ (참고)', r.deltaReal == null ? '—' : fmt(r.deltaReal, 2) + '°' + (r.shell != null && r.deltaRealCap != null ? ` (상판 ${fmt(r.deltaRealCap, 2)}°)` : ''))}
+            {kv('A 잔차 (참고)', f(r.aResid))}
+            {r.rotScale != null && kv('회전 환산 배율', `B 1° → 회전 ${fmt(r.rotScale, 1)}°`)}
+          </div>
           <div class="kv-group">
             {kv('δ (도면)', `${fmt(r.delta, 2)}° ${capDirText(r.delta, r.dir)}`.trim())}
             {r.shell != null && kv('캡 자리 외판', `${fmt(r.shell, 1)}° → 상판 δ ${fmt(r.deltaCap, 2)}°`)}
-            {kv('실제 δ', r.deltaReal == null ? '—' : fmt(r.deltaReal, 2) + '°' + (r.shell != null && r.deltaRealCap != null ? ` (상판 ${fmt(r.deltaRealCap, 2)}°)` : ''))}
-            {kv('회전오차', isLegacyCap(r) ? f(r.rotErr) : `${f(r.rotErr)} · ${rotText(r.rotErr, r.delta ?? 0, r.dir ?? 1)}`)}
             {r.calcRev != null && kv('캡 자세', r.up ? '하늘 (턴오버 후)' : '바닥')}
-          </div>
-          <div class="kv-group">
             {kv('F.A', isLegacyCap(r) ? `${fmt(r.fa, 2)}° (방향 기록 없음)` : `${fmt(r.fa, 2)}° · ${leanText(r.faDir ?? 1)}`)}
-            {kv('B 실측', isLegacyCap(r) ? `${fmtSigned(r.measB, 2)}° (높은 쪽 기록 없음)` : bText(r.measB, r.faDir ?? 1))}
-            {kv('B 정상', isLegacyCap(r) ? `${fmtSigned(r.normalB, 2)}°` : bText(r.normalB, r.faDir ?? 1))}
-            {kv('A 실측 / 정상', `${fmt(r.measA, 2)}° / ${fmt(r.normalA, 2)}°`)}
-            {kv('A 잔차', f(r.aResid))}
           </div>
         </>
       ) : (
@@ -373,7 +390,7 @@ function RecordSheet(p: { record: MeasureRecord | null; onClose: () => void; onD
         )}
         {r.mode === 'cap' &&
           !isLegacyCap(r) &&
-          kv('계산 방식', r.calcRev ? `1.6.0${r.recalcAt ? ` · ${fmtDate(r.recalcAt).slice(5)} 다시 계산` : ''}` : '1.6.0 전 (외판 · 턴오버 반영 안 됨)')}
+          kv('계산 방식', r.calcRev ? `${calcRevName(r.calcRev)}${r.recalcAt ? ` · ${fmtDate(r.recalcAt).slice(5)} 다시 계산` : ''}` : '1.6.0 전 (외판 · 턴오버 반영 안 됨)')}
       </div>
       {r.memo && (
         <div class="kv-group">

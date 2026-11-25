@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { Dir } from '../../calc/angle';
 import { basisName, effectiveAngles, taText, type Effective } from '../../calc/basis';
 import { capGeom, capResult } from '../../calc/capcalc';
-import { capDirText, capVerdict, fmt, fmtSigned, parseNum, verdictLevel } from '../../calc/judge';
+import { LOW_TA, capDirText, capJudge, fmt, fmtSigned, lowTaText, parseNum, rotScale, verdictLevel } from '../../calc/judge';
 import { analyzeCapDir, bDevText, bText, capDirOf, capNormalDir, dirName, dirSuspect, faHighSide, flipSuspect, highOfB, highSensitive, leanText, rotText, signedA, signedB, type CapGeom } from '../../calc/sign';
 import { clearDraft, loadDraft, saveDraft, type Draft, type Reading } from '../../db/draft';
 import { deleteCap, getBlock, getCap, newId, saveBlock, saveRecord, type Block, type Cap } from '../../db/store';
@@ -14,7 +14,7 @@ import { back, go } from '../router';
 import { ConfirmSheet, Cta, Headline, MenuRow, NumInput, RefNote, RefWarningSheet, Seg, Sheet, TopBar, toast } from '../components/ui';
 import { HeadCard, HighPicker, ReadingCard, useHead, useHighSide, useMeasure } from '../components/reading';
 import { Gauge, PlanFigure } from '../components/gauge';
-import { IBack, ICamera, ICheck, IChevron, IEdit, IImage, IInfo, IMinus, IMore, IRuler, ITrash, IWarn, IX } from '../icons';
+import { IBack, ICamera, ICheck, IChevron, IEdit, IImage, IInfo, IMore, IRuler, ITrash, IWarn, IX } from '../icons';
 import { CapFaceSeg, CapSheet } from './edit-sheets';
 import { makePhoto } from './photo';
 
@@ -437,7 +437,7 @@ export function CapScreen(p: { blockId: string; capId: string }) {
         normal={isB ? normal.thetaB : normal.thetaA}
         faDir={eff.faDir}
         weak={!isB && aWeak}
-        sensitive={isB && highSensitive(eff.ta, eff.fa, eff.faDir, cap.delta, cap.dir, s.rotTol, g)}
+        sensitive={isB && highSensitive(eff.ta, eff.fa, eff.faDir, cap.delta, cap.dir, s.capTol, g)}
         onGuide={() => setGuide(true)}
         onDone={(r) => {
           const d = isB ? { ...draft, first: r } : { ...draft, second: r };
@@ -636,13 +636,15 @@ function ResultScreen(p: {
   );
   // ① 캡 · F.A 방향 · 턴오버 점검 (A 로) — 의심되면 판정을 보류한다
   const dirS = dirSuspect(eff.ta, eff.fa, eff.faDir, cap.delta, capDir, p.rA.v, g);
-  // ② 높은 쪽 : 판정을 가르는 캡이면 두 결과를 나란히, 아니면 반대가 훨씬 그럴듯할 때만
-  const sensitive = highSensitive(eff.ta, eff.fa, eff.faDir, cap.delta, capDir, s.rotTol, g);
-  const suspect = p.rB.high && !sensitive ? flipSuspect(r, flipped, s.rotTol) : null;
+  // ② 높은 쪽 : 판정을 가르는 캡이면 두 결과를 나란히, 아니면 반대가 훨씬 그럴듯할 때만 (B 편차 기준)
+  const sensitive = highSensitive(eff.ta, eff.fa, eff.faDir, cap.delta, capDir, s.capTol, g);
+  const suspect = p.rB.high && !sensitive ? flipSuspect(r, flipped, s.capTol) : null;
   // ③ A · B 를 바꿔 넣음 (A 는 보통 B 보다 훨씬 크다)
   const swapped = Math.abs(r.thetaA) > Math.abs(r.thetaB) + 5 && p.rA.v < p.rB.v;
-  const verdict = capVerdict(r.rotErr, s);
-  const flipVerdict = capVerdict(flipped.rotErr, s);
+  // 판정 = A · B 현물 비교 (OK / 주의 / NG), 역산 회전은 참고 — 허용오차를 바꾸면 바로 다시 계산
+  const j = res.judge;
+  const verdict = j.verdict;
+  const flipVerdict = capJudge(flipped.errA, flipped.errB, flipped.rotErr, eff.ta, s.capTol).verdict;
   const lvl = verdictLevel(verdict);
   const residWarn = r.aResid != null && Math.abs(r.aResid) > s.aResidTol;
   const aWeak = r.dA < s.aSensMin;
@@ -653,20 +655,16 @@ function ResultScreen(p: {
   const [saving, setSaving] = useState(false);
   const [tolOpen, setTolOpen] = useState(false);
   const [tolText, setTolText] = useState('');
+  const [whyOpen, setWhyOpen] = useState(false);
   const d = 2; // 결과는 항상 소수 2자리 (엑셀 계산시트와 맞춤)
   const highNow = p.rB.high;
+  const tolNew = parseNum(tolText);
 
   useEffect(() => () => void (photoUrl && URL.revokeObjectURL(photoUrl)), [photoUrl]);
 
   const heading =
-    verdict === 'OK'
-      ? '회전오차가 허용 범위 안이에요'
-      : verdict === 'NG'
-        ? '회전오차가 허용 범위를 넘었어요'
-        : verdict === '기준미정'
-          ? '판정 기준이 아직 없어요'
-          : 'B 값이 계산 범위를 벗어났어요';
-  const Mark = verdict === 'OK' ? ICheck : verdict === 'NG' ? IX : verdict === '판정불가' ? IWarn : IMinus;
+    verdict === 'OK' ? 'A · B 모두 허용오차 안이에요' : verdict === 'NG' ? 'A · B 가 허용오차를 넘었어요' : 'A · B 는 합격, 회전을 확인해주세요';
+  const Mark = verdict === 'OK' ? ICheck : verdict === 'NG' ? IX : IWarn;
 
   const save = async () => {
     setSaving(true);
@@ -686,7 +684,6 @@ function ResultScreen(p: {
       capId: cap.id,
       capNo: cap.no,
       highB: p.rB.high,
-      verdict,
       memo: memo.trim(),
       photo: photo ?? undefined,
     });
@@ -781,32 +778,61 @@ function ResultScreen(p: {
     <div class="screen">
       {p.bar}
       <div class="result-hero">
-        <div class={'mark ' + (lvl === 'none' ? (verdict === '판정불가' ? 'warn' : 'none') : lvl)}>
+        <div class={'mark ' + lvl}>
           <Mark />
         </div>
         <h1>{heading}</h1>
-        {r.rotErr != null && (
-          <>
-            <div class={'rot num c-' + (lvl === 'none' ? 'none' : lvl)} style={lvl === 'none' ? { color: 'var(--text)' } : undefined}>
-              {fmtSigned(r.rotErr, d)}°
-            </div>
-            <p class="num">
-              {rotText(r.rotErr, cap.delta, capDir)} · 실제 δ {fmt(r.deltaReal, d)}° (도면 {fmt(cap.delta, 2)}°)
-            </p>
-            {g.shell != null && r.deltaRealCap != null && (
-              <p class="num">
-                외판 {fmt(g.shell, 1)}° · 캡 상판으로는 {fmt(r.deltaRealCap, d)}° (도면이면 {fmt(r.deltaCap, d)}°)
-              </p>
-            )}
-          </>
-        )}
-        {verdict === '기준미정' && (
-          <button class="text-btn mt8" onClick={() => setTolOpen(true)}>
-            허용 회전오차 정하기
-          </button>
-        )}
-        {verdict === '판정불가' && <p>B 숫자와 높은 쪽(선수/선미)을 다시 확인해주세요</p>}
+        <button
+          class="text-btn mt8 num"
+          onClick={() => {
+            setTolText(String(s.capTol));
+            setTolOpen(true);
+          }}
+        >
+          합격 허용오차 ±{fmt(s.capTol, 1)}°
+        </button>
       </div>
+
+      <div class="section">
+        <div class="ab-grid">
+          <AbCell
+            title="각도 B"
+            sub={'WEB 직각' + (p.rB.manual ? ' · 수평계' : '')}
+            dev={fmt(Math.abs(r.errB), d)}
+            devNote={bDevText(r.errB, eff.faDir, d)}
+            bad={Math.abs(r.errB) > j.tol + 1e-9}
+            meas={`${fmt(Math.abs(measB), d)}°`}
+            measSub={sideText(measB, eff.faDir)}
+            normal={`${fmt(Math.abs(r.thetaB), d)}°`}
+            normalSub={sideText(r.thetaB, eff.faDir)}
+          />
+          <AbCell
+            title="각도 A"
+            sub={'WEB 방향' + (aWeak ? ' · 회전에 둔함' : '')}
+            dev={fmtSigned(r.errA, d)}
+            devNote={Math.abs(r.errA) < 0.005 ? '정상과 같아요' : `정상보다 ${fmt(Math.abs(r.errA), d)}° ${Math.abs(measA) > Math.abs(r.thetaA) ? '커요' : '작아요'}`}
+            bad={Math.abs(r.errA) > j.tol + 1e-9}
+            meas={`${fmt(measA, d)}°`}
+            normal={`${fmt(r.thetaA, d)}°`}
+          />
+        </div>
+      </div>
+
+      {verdict === '주의' && (
+        <div class="alert warn">
+          <IWarn />
+          <div>
+            <b>{j.caution === 'noinv' ? '역산 불가 — B 로 회전각을 풀 수 없어요' : '역산 회전각이 허용오차를 넘음 – 캡 회전 재확인'}</b>
+            <span class="num">
+              {j.lowTa
+                ? lowTaText(j.scale)
+                : j.caution === 'noinv'
+                  ? 'B 숫자와 높은 쪽(선수/선미)을 다시 확인해주세요'
+                  : 'A · B 는 허용오차 안이에요. 캡이 돌아갔는지 눈으로 한 번 더 확인해주세요'}
+            </span>
+          </div>
+        </div>
+      )}
 
       {swapped && (
         <div class="alert bad">
@@ -823,18 +849,18 @@ function ResultScreen(p: {
           <IWarn />
           <div>
             <b>높은 쪽이 맞는지 다시 재서 확인해주세요</b>
-            <span>{Math.abs(r.thetaB) < 2 ? '이 캡은 B 가 거의 수평이라, 높은 쪽 하나로 결과가 정반대가 돼요' : '이 캡은 높은 쪽 하나로 OK · NG 가 바뀌어요'}</span>
+            <span>{Math.abs(r.thetaB) < 2 ? '이 캡은 B 가 거의 수평이라, 높은 쪽을 반대로 골라도 B 편차가 작게 나와요' : '이 캡은 높은 쪽 하나로 판정이 바뀔 수 있어요'}</span>
             <div class="two-out num">
               <div class="on">
                 <span>기록대로 {dirName(highNow)} 높음</span>
                 <b class={'c-' + verdictLevel(verdict)}>
-                  {fmtSigned(r.rotErr, d)}° {verdict === 'OK' || verdict === 'NG' ? verdict : ''}
+                  B 편차 {fmt(Math.abs(r.errB), d)}° {verdict}
                 </b>
               </div>
               <div>
                 <span>{dirName(-highNow as Dir)} 높음이었다면</span>
                 <b>
-                  {fmtSigned(flipped.rotErr, d)}° {flipVerdict === 'OK' || flipVerdict === 'NG' ? flipVerdict : ''}
+                  B 편차 {fmt(Math.abs(flipped.errB), d)}° {flipVerdict}
                 </b>
               </div>
             </div>
@@ -851,7 +877,7 @@ function ResultScreen(p: {
           <div>
             <b>B 높은 쪽을 반대로 고르지 않았나요?</b>
             <span class="num">
-              {dirName(-highNow as Dir)} 쪽이 높으면 회전오차가 {fmtSigned(suspect, 2)}° 예요.
+              {dirName(-highNow as Dir)} 쪽이 높으면 B 편차가 {fmt(Math.abs(suspect), 2)}° 예요.
               {Math.abs(cap.delta) < 1e-9 ? ` δ 0° 캡은 보통 ${dirName(faHighSide(eff.faDir))} 쪽이 높아요.` : ''}
             </span>
             <button class="btn small dark mt8" onClick={p.onRetryB}>
@@ -862,22 +888,57 @@ function ResultScreen(p: {
       )}
 
       <RefNote />
-      <div style={{ height: '16px' }} />
 
-      {residWarn && (
-        <div class="banner">
-          <IWarn />
-          <div>
-            <b>A 잔차 {fmtSigned(r.aResid, d)}° — 재측정을 권해요</b>
-            <span class="muted">WEB 방향 숙어짐 또는 측정 위치가 의심돼요</span>
+      <div class="section-title ref-title">
+        <span>참고값 · 판정에는 안 써요</span>
+        <button class="help-dot" aria-label="역산 회전각을 판정에 쓰지 않는 이유" onClick={() => setWhyOpen(true)}>
+          ?
+        </button>
+      </div>
+      <div class="section">
+        <div class="card ref-card">
+          <div class="kv-group">
+            <div class="kv">
+              <span class="k">역산 회전오차</span>
+              <span class={'v num' + (j.caution ? ' c-warn' : '')}>
+                {r.rotErr == null ? '역산 불가' : `${fmtSigned(r.rotErr, d)}°`}
+              </span>
+            </div>
+            {r.rotErr != null && (
+              <div class="kv sub">
+                <span class="k" />
+                <span class="v">{rotText(r.rotErr, cap.delta, capDir)}</span>
+              </div>
+            )}
+            <div class="kv">
+              <span class="k">실제 δ</span>
+              <span class="v num">
+                {fmt(r.deltaReal, d)}° (도면 {fmt(cap.delta, 2)}°)
+              </span>
+            </div>
+            {g.shell != null && r.deltaRealCap != null && (
+              <div class="kv">
+                <span class="k">캡 상판 δ</span>
+                <span class="v num">
+                  {fmt(r.deltaRealCap, d)}° (도면이면 {fmt(r.deltaCap, d)}°)
+                </span>
+              </div>
+            )}
+            <div class="kv">
+              <span class="k">A 잔차</span>
+              <span class={'v num' + (residWarn ? ' c-warn' : '')}>{fmtSigned(r.aResid, d)}°</span>
+            </div>
+            {residWarn && (
+              <div class="kv sub">
+                <span class="k" />
+                <span class="v c-warn">WEB 숙어짐 · 측정 위치가 의심돼요</span>
+              </div>
+            )}
+            <div class="kv">
+              <span class="k">회전 환산 배율</span>
+              <span class={'v num' + (j.lowTa ? ' c-warn' : '')}>B 1° → 회전 {fmt(j.scale, 1)}°</span>
+            </div>
           </div>
-        </div>
-      )}
-
-      <PlanFigure delta={cap.delta} dir={capDir} deltaReal={r.deltaReal} />
-
-      <div class="section mt16">
-        <div class="card" style={{ padding: '10px 20px' }}>
           <div class="kv-group">
             <div class="kv">
               <span class="k">계산 기준</span>
@@ -893,46 +954,12 @@ function ResultScreen(p: {
               </span>
             </div>
           </div>
-          <div class="kv-group">
-            <div class="kv">
-              <span class="k">각도 B 실측{p.rB.manual ? ' (수평계)' : ''}</span>
-              <span class="v num">{bText(measB, eff.faDir, d)}</span>
-            </div>
-            <div class="kv">
-              <span class="k">정상 B</span>
-              <span class="v num">{bText(r.thetaB, eff.faDir, d)}</span>
-            </div>
-            <div class="kv">
-              <span class="k">B 각도오차</span>
-              <span class="v num">{bDevText(r.errB, eff.faDir, d)}</span>
-            </div>
-          </div>
-          <div class="kv-group">
-            <div class="kv">
-              <span class="k">각도 A 실측{aWeak ? ' (참고)' : ''}</span>
-              <span class="v num">{fmt(measA, d)}°</span>
-            </div>
-            <div class="kv">
-              <span class="k">정상 A</span>
-              <span class="v num">{fmt(r.thetaA, d)}°</span>
-            </div>
-            <div class="kv">
-              <span class="k">A 각도오차</span>
-              <span class="v num">{fmtSigned(r.errA, d)}°</span>
-            </div>
-            <div class="kv">
-              <span class="k">A 예측 (실제 δ 기준)</span>
-              <span class="v num">{fmt(r.aPred, d)}°</span>
-            </div>
-            <div class="kv">
-              <span class="k">A 잔차</span>
-              <span class={'v num' + (residWarn ? ' c-warn' : '')}>{fmtSigned(r.aResid, d)}°</span>
-            </div>
-          </div>
         </div>
       </div>
 
-      <div class="section">
+      <PlanFigure delta={cap.delta} dir={capDir} deltaReal={r.deltaReal} />
+
+      <div class="section mt16">
         <div class="field">
           <label>메모 (선택)</label>
           <input class="input" type="text" value={memo} placeholder="특이사항" onInput={(e) => setMemo((e.target as HTMLInputElement).value)} />
@@ -984,18 +1011,18 @@ function ResultScreen(p: {
         </button>
       </Cta>
       <Sheet open={tolOpen} onClose={() => setTolOpen(false)}>
-        <h2>허용 회전오차</h2>
-        <p class="sub">회전오차가 이 값 이하면 OK 예요. 설정에서도 바꿀 수 있어요</p>
-        <NumInput value={tolText} onInput={setTolText} placeholder="예: 2.0" unit="°" autoFocus />
+        <h2>합격 허용오차</h2>
+        <p class="sub">A · B 편차가 이 값 이하면 OK 예요. 0.1° 단위로 저장되고, 설정에서도 바꿀 수 있어요</p>
+        <NumInput value={tolText} onInput={setTolText} placeholder="3.0" unit="°" autoFocus />
         <div class="actions mt16">
           <button class="btn grey" onClick={() => setTolOpen(false)}>
             닫기
           </button>
           <button
             class="btn"
-            disabled={parseNum(tolText) == null}
+            disabled={tolNew == null || Math.abs(tolNew) < 0.1}
             onClick={() => {
-              setSettings({ rotTol: Math.abs(parseNum(tolText)!) });
+              setSettings({ capTol: Number(Math.abs(tolNew!).toFixed(1)) });
               setTolOpen(false);
             }}
           >
@@ -1003,7 +1030,88 @@ function ResultScreen(p: {
           </button>
         </div>
       </Sheet>
+      <RotWhySheet open={whyOpen} onClose={() => setWhyOpen(false)} ta={eff.ta} />
       {p.children}
     </div>
+  );
+}
+
+/** A · B 주 표시 한 칸 — 편차를 크게, 현물 · 정상을 그 아래 */
+function AbCell(p: { title: string; sub: string; dev: string; devNote: string; bad: boolean; meas: string; measSub?: string; normal: string; normalSub?: string }) {
+  return (
+    <div class="ab-cell">
+      <div class="ab-head">
+        <b>{p.title}</b>
+        <span>{p.sub}</span>
+      </div>
+      <div class={'ab-dev num ' + (p.bad ? 'c-bad' : 'c-good')}>
+        {p.dev}
+        <small>°</small>
+      </div>
+      <div class="ab-note">{p.devNote}</div>
+      <div class="ab-kv">
+        <span>현물</span>
+        <b class="num">
+          {p.meas}
+          {p.measSub && <em>{p.measSub}</em>}
+        </b>
+      </div>
+      <div class="ab-kv">
+        <span>정상</span>
+        <b class="num">
+          {p.normal}
+          {p.normalSub && <em>{p.normalSub}</em>}
+        </b>
+      </div>
+    </div>
+  );
+}
+
+/** 역산 회전각을 합격 기준으로 쓰지 않는 이유 (1.7.0) — 호선 · 블록 이름은 앱에 넣지 않는다 */
+export function RotWhySheet(p: { open: boolean; onClose: () => void; ta?: number }) {
+  const rows = [46.7, 34.4, 17.4];
+  return (
+    <Sheet open={p.open} onClose={p.onClose}>
+      <h2>역산 회전각을 판정에 안 쓰는 이유</h2>
+      <p class="sub">합격 · 불합격은 A · B 현물 비교로 정하고, 역산 회전각은 이상이 있을 때 알려 주는 참고로만 써요</p>
+      <div class="why">
+        <b>1. 오차가 커져요</b>
+        <p>역산 회전각은 B각을 거꾸로 풀어 구해요. 캡이 1° 돌 때 B 는 약 sin(T.A)° 만 변해서, B 를 1° 잘못 재면 회전각은 1/sin(T.A) 배로 커져요.</p>
+        <table class="why-tbl num">
+          <thead>
+            <tr>
+              <th>T.A</th>
+              <th>B 1°당 회전 환산</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((t) => (
+              <tr class={t < LOW_TA ? 'hi' : ''}>
+                <td>{fmt(t, 1)}°</td>
+                <td>약 {fmt(rotScale(t), 1)}배</td>
+              </tr>
+            ))}
+            {p.ta != null && (
+              <tr class={'now' + (p.ta < LOW_TA ? ' hi' : '')}>
+                <td>이 블록 {fmt(p.ta, 1)}°</td>
+                <td>약 {fmt(rotScale(p.ta), 1)}배</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+        <b>2. 실제 사례 (2026-11-25 현장)</b>
+        <p>
+          T.A 17°대 블록에서 정상 설치된 캡 8개 중 4개가 역산 회전각으로는 NG(−5.2° ~ −8.2°, +3.3°)로 나왔어요. 예 : B편차 −2.61° × 3.3배 ≈ 회전 −8.2°. 캡이 실제로 그만큼
+          틀어진 것은 아니에요.
+        </p>
+        <b>3. 그래서</b>
+        <p>합격 · 불합격은 A · B 현물 비교로 정하고, 역산 회전각은 허용오차를 넘거나 풀 수 없을 때 ‘주의’로만 알려요.</p>
+      </div>
+      <div class="actions mt16">
+        <button class="btn" onClick={p.onClose}>
+          확인했어요
+        </button>
+      </div>
+    </Sheet>
   );
 }

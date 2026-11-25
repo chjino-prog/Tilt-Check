@@ -1,8 +1,7 @@
 // 블록 · 지주캡 등록/수정 바텀시트
 import { useEffect, useState } from 'preact/hooks';
-import { blockAnglesLookRight, maxShellDelta, type Dir } from '../../calc/angle';
+import { blockAnglesLookRight, type Dir } from '../../calc/angle';
 import { fmt, parseNum } from '../../calc/judge';
-import { shellDeltaOk } from '../../calc/sign';
 import { newId, saveBlock, saveCap, type Block, type Cap } from '../../db/store';
 import { ShellHelpSheet } from '../components/shell';
 import { Field, NumInput, Seg, Sheet, TextInput, toast } from '../components/ui';
@@ -146,8 +145,7 @@ export function CapSheet(p: { open: boolean; blockId: string; cap?: Cap | null; 
   const sRaw = parseNum(shell);
   const sN = zero || sRaw == null ? null : Math.abs(sRaw);
   const shellRange = sN == null || sN < 90;
-  const shellFits = dN == null || sN == null || shellDeltaOk(dN, sN);
-  const ready = no.trim() !== '' && dN != null && dN >= 0 && dN < 90 && shellRange && shellFits;
+  const ready = no.trim() !== '' && dN != null && dN >= 0 && dN < 90 && shellRange;
 
   const save = async () => {
     if (!ready) return;
@@ -194,10 +192,7 @@ export function CapSheet(p: { open: boolean; blockId: string; cap?: Cap | null; 
             <button class="text-btn" style={{ marginTop: '-4px', marginBottom: '8px' }} onClick={() => setHelp(true)}>
               어디를 재나요?
             </button>
-            {!shellRange && <div class="warn-text">외판 기울기는 0 ~ 90° 사이로 넣어주세요.</div>}
-            {shellRange && !shellFits && sN != null && (
-              <div class="warn-text">외판이 {fmt(sN, 1)}° 면 δ 는 {fmt(maxShellDelta(sN), 1)}° 보다 작아야 해요. 도면 δ 와 외판 기울기를 확인해주세요.</div>
-            )}
+            {!shellRange && <div class="warn-text">외판 기울기는 90° 보다 작게 넣어주세요.</div>}
           </>
         )}
         <div class="actions">

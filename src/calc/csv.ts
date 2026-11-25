@@ -1,6 +1,7 @@
 // CSV 내보내기 — 작업지시서 5-4 저장 항목 순서
 import type { MeasureRecord } from '../db/store';
-import { capDirText, fmtDate, isLegacyCap } from './judge';
+import { capDirText, fmtDate, isLegacyCap, rotScale } from './judge';
+import { calcRevName } from './capcalc';
 import { dirName, highOfB } from './sign';
 
 export const CSV_HEADER = [
@@ -36,10 +37,27 @@ export const CSV_HEADER = [
   '캡자세',
   '도면T.A',
   '계산방식',
+  // 1.7.0 — 판정 = A · B 현물 비교, 역산 회전은 참고
+  '판정기준(A·B)',
+  '역산회전(참고)',
+  '회전 환산 배율',
+  '경고(주의 사유)',
+  '허용오차',
 ];
 
 const side = (d: 1 | -1 | null | undefined) => (d == null ? '수평' : dirName(d));
 const n = (v: number | null | undefined, d = 2) => (v == null || !isFinite(v) ? '' : v.toFixed(d));
+
+/** 1.7.0 판정 칸 — 허용오차가 남은 기록(1.7.0 계산)만 채운다 */
+function abCells(r: MeasureRecord): string[] {
+  if (r.mode !== 'cap') return ['', '', '', '', ''];
+  const tol = r.tol;
+  const judged = tol != null && r.errA != null && r.errB != null;
+  const abOk = judged && Math.abs(r.errA!) <= tol + 1e-9 && Math.abs(r.errB!) <= tol + 1e-9;
+  const rot = !judged ? '' : r.rotErr == null ? '역산 불가' : `${n(r.rotErr)}${Math.abs(r.rotErr) > tol + 1e-9 ? ' 초과' : ''}`;
+  const scale = r.rotScale ?? (r.ta ? rotScale(r.ta) : null);
+  return [judged ? (abOk ? 'OK' : 'NG') : '', rot, n(scale, 1), r.caution ?? '', judged ? n(tol, 1) : ''];
+}
 
 function cell(v: string): string {
   return /[",\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
@@ -82,7 +100,8 @@ export function recordsToCsv(records: MeasureRecord[]): string {
         cap ? n(r.deltaRealCap) : '',
         cap && r.calcRev ? (r.up ? '하늘(턴오버 후)' : '바닥') : '',
         n(r.taDesign, 3),
-        r.calcRev ? `1.6.0${r.recalcAt ? ' 다시 계산' : ''}` : cap ? '1.6.0 전' : '',
+        cap || r.calcRev ? calcRevName(r.calcRev) + (r.calcRev && r.recalcAt ? ' 다시 계산' : '') : '',
+        ...abCells(r),
       ];
     });
   // 엑셀에서 한글이 깨지지 않도록 BOM + CRLF

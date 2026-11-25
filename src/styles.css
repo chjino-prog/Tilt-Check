@@ -1845,3 +1845,161 @@ textarea.input {
   font-size: 13px;
   color: var(--text-2);
 }
+
+/* ── 1.7.0 지주캡 결과 : A · B 주 표시 + 참고값 */
+.ab-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.ab-cell {
+  background: var(--bg-sub);
+  border-radius: 20px;
+  padding: 16px 16px 12px;
+  min-width: 0;
+}
+:root[data-theme='dark'] .ab-cell {
+  background: var(--card);
+}
+.ab-head {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.ab-head b {
+  font-size: 16px;
+  font-weight: 700;
+}
+.ab-head span {
+  font-size: 13px;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ab-dev {
+  font-size: 36px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin-top: 8px;
+  line-height: 1.1;
+}
+.ab-dev small {
+  font-size: 20px;
+  font-weight: 700;
+  margin-left: 1px;
+}
+.ab-note {
+  font-size: 13px;
+  color: var(--text-2);
+  margin-top: 2px;
+  min-height: 2.6em;
+  word-break: keep-all;
+}
+.ab-kv {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 6px;
+  padding: 8px 0 0;
+  margin-top: 8px;
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+}
+.ab-kv + .ab-kv {
+  border-top: 0;
+  margin-top: 0;
+  padding-top: 4px;
+}
+.ab-kv span {
+  color: var(--text-3);
+  flex: none;
+}
+.ab-kv b {
+  font-size: 15px;
+  font-weight: 600;
+  text-align: right;
+}
+.ab-kv b em {
+  display: block;
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-3);
+}
+.ref-title {
+  margin-top: 8px;
+}
+.help-dot {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 0;
+  background: var(--grey-btn);
+  color: var(--text-2);
+  font-size: 14px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.help-dot:active {
+  background: var(--grey-btn-press);
+}
+.ref-card {
+  padding: 6px 16px;
+}
+.ref-card .kv {
+  font-size: 14px;
+  padding: 7px 0;
+}
+.ref-card .kv .v {
+  font-weight: 500;
+  color: var(--text-2);
+}
+.ref-card .kv .v.c-warn {
+  color: var(--orange);
+}
+.ref-card .kv.sub {
+  padding-top: 0;
+  font-size: 13px;
+}
+.why b {
+  display: block;
+  font-size: 16px;
+  margin-top: 16px;
+}
+.why b:first-child {
+  margin-top: 4px;
+}
+.why p {
+  margin: 4px 0 0;
+  font-size: 15px;
+  color: var(--text-2);
+  line-height: 1.55;
+  word-break: keep-all;
+}
+.why-tbl {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  font-size: 15px;
+}
+.why-tbl th,
+.why-tbl td {
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.why-tbl th {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-3);
+}
+.why-tbl tr.hi td {
+  color: var(--orange);
+  font-weight: 700;
+}
+.why-tbl tr.now td {
+  background: var(--bg-sub);
+}

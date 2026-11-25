@@ -18,10 +18,52 @@ export function lineVerdict(dev: number, s: Settings): Verdict {
   return l === 'good' ? '양호' : l === 'warn' ? '주의' : '초과';
 }
 
-export function capVerdict(rotErr: number | null, s: Settings): Verdict {
-  if (rotErr == null) return '판정불가';
-  if (s.rotTol == null) return '기준미정';
-  return Math.abs(rotErr) <= s.rotTol + 1e-9 ? 'OK' : 'NG';
+/**
+ * 지주캡 판정 (1.7.0) — 합격 · 불합격은 A · B 현물 실측과 정상값의 단순 비교로 정한다.
+ * 역산 회전각은 B 를 거꾸로 풀어 구해서 B 측정 오차가 1/sin(T.A) 배로 커진다
+ * (T.A 17° 블록이면 B 1° 오차 → 회전 3.3°). 그래서 판정에는 쓰지 않고 '주의' 만 띄운다.
+ *   NG   : |A 편차| 또는 |B 편차| > 허용오차
+ *   주의 : A · B 는 안인데 역산 회전오차가 허용오차를 넘거나 역산이 안 됨
+ *   OK   : 둘 다 아님
+ */
+export type CapCaution = 'rot' | 'noinv';
+
+export interface CapJudge {
+  verdict: 'OK' | '주의' | 'NG';
+  tol: number; // 판정에 쓴 허용오차
+  caution: CapCaution | null; // 주의 사유 (NG · OK 면 null)
+  scale: number; // 회전 환산 배율 = 1 / sin(T.A) — B 1° 가 회전 몇 ° 로 보이는지
+  lowTa: boolean; // T.A 24° 미만 (배율 2.5 초과) — 역산 회전각이 크게 부풀려지는 블록
+}
+
+/** T.A 가 이보다 작으면 역산 회전각을 믿기 어렵다고 알린다 (배율 > 2.5) */
+export const LOW_TA = 24;
+
+/** 회전 환산 배율 1 / sin(T.A) */
+export const rotScale = (ta: number) => 1 / Math.sin((Math.abs(ta) * Math.PI) / 180);
+
+export function capJudge(errA: number, errB: number, rotErr: number | null | undefined, ta: number, tol: number): CapJudge {
+  const t = Math.abs(tol) + 1e-9;
+  const scale = rotScale(ta);
+  const lowTa = Math.abs(ta) < LOW_TA;
+  const base = { tol: Math.abs(tol), scale, lowTa };
+  if (!(Math.abs(errA) <= t) || !(Math.abs(errB) <= t)) return { verdict: 'NG', caution: null, ...base };
+  if (rotErr == null || !isFinite(rotErr)) return { verdict: '주의', caution: 'noinv', ...base };
+  if (Math.abs(rotErr) > t) return { verdict: '주의', caution: 'rot', ...base };
+  return { verdict: 'OK', caution: null, ...base };
+}
+
+/** 주의 사유 — 짧은 글 (기록 · CSV · 목록) */
+export function cautionText(j: Pick<CapJudge, 'caution' | 'scale' | 'lowTa'>): string {
+  if (!j.caution) return '';
+  const head = j.caution === 'noinv' ? '역산 불가' : '역산 회전각이 허용오차를 넘음 – 캡 회전 재확인';
+  return j.lowTa ? `${head} · T.A 24° 미만 (회전 ${fmt(j.scale, 1)}배 증폭)` : head;
+}
+
+/** 주의 사유 — T.A 24° 미만일 때 함께 보여주는 설명 */
+export function lowTaText(scale: number): string {
+  const n = fmt(scale, 1);
+  return `T.A가 24° 미만이라 B각 오차가 역산 회전각에 약 ${n}배로 커집니다(이 블록 N = ${n}). 역산 회전각이 크게 나와도 실제로 캡이 그만큼 틀어졌다고 볼 수 없습니다. A·B 현물 비교 결과를 기준으로 판단하세요.`;
 }
 
 export function verdictLevel(v: Verdict): Level {

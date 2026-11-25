@@ -2,7 +2,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { BASIS_DIFF_OK, buildReport, hhmm, reportFileName, shortDate, spanText, type Report, type ReportRow } from '../../calc/report';
 import { dirName, leanText } from '../../calc/sign';
-import { fmt } from '../../calc/judge';
+import { fmt, fmtSigned } from '../../calc/judge';
 import { getBlock, listCaps, listRecordsByBlock } from '../../db/store';
 import { useSettings } from '../../settings';
 import { Cta, Empty, Sheet, TopBar } from '../components/ui';
@@ -34,7 +34,7 @@ export function ReportScreen(p: { blockId: string }) {
     Promise.all([getBlock(p.blockId), listCaps(p.blockId), listRecordsByBlock(p.blockId)]).then(([b, caps, recs]) =>
       setRep(b ? buildReport(b, caps, recs, s) : null),
     );
-  }, [p.blockId, s.rotTol, s.aResidTol]);
+  }, [p.blockId, s.capTol, s.aResidTol]);
 
   const fileName = rep ? reportFileName(rep, now) : 'TILTCHECK';
 
@@ -145,7 +145,7 @@ function ReportSheet(p: { rep: Report; printedAt: number; zoom: number; onOverfl
   useEffect(() => p.onOverflow(over), [over]);
   const span = spanText(r.from, r.to);
   const used = r.basis;
-  const tolText = r.tol == null ? '허용 회전오차 미정' : `허용 ±${fmt(r.tol, 2)}° 초과`;
+  const tolText = `A·B 허용 ±${fmt(r.tol, 1)}° 초과`;
 
   return (
     <div class={'rpt-sheet' + (lv >= 1 ? ' tight' : '') + (lv >= 3 ? ' two' : '') + (lv === 2 || lv === 3 ? ' figs-s' : '') + (lv >= 4 ? ' figs-none' : '')} ref={ref} style={{ zoom: p.zoom }}>
@@ -185,23 +185,24 @@ function ReportSheet(p: { rep: Report; printedAt: number; zoom: number; onOverfl
             {r.ok}
             <small>개</small>
           </span>
+          {r.caution > 0 && <span class="s warn">주의 {r.caution}개 (역산 회전 참고)</span>}
           {r.undecided > 0 && <span class="s">판정 보류 {r.undecided}개</span>}
         </div>
         <div class={r.ng > 0 ? 'bad' : ''}>
           <span class="k">NG · {tolText}</span>
           <span class={'v' + (r.ng > 0 ? ' ng' : '')}>
-            {r.tol == null ? '—' : r.ng}
-            {r.tol != null && <small>개</small>}
+            {r.ng}
+            <small>개</small>
           </span>
         </div>
         <div class="worst">
-          <span class="k">가장 큰 회전오차</span>
+          <span class="k">가장 큰 편차 (A · B)</span>
           {r.worst ? (
             <>
               <span class={'v' + (r.worst.verdict === 'NG' ? ' ng' : '')}>
-                {r.worst.capNo} · {f2(r.worst.rotErr)}°
+                {r.worst.capNo} · {Math.abs(r.worst.errB!) >= Math.abs(r.worst.errA!) ? `B ${f2(r.worst.errB)}°` : `A ${f2(r.worst.errA)}°`}
               </span>
-              <span class="s">{r.worst.rotText}</span>
+              <span class="s">역산 회전 {r.worst.rotErr == null ? '불가' : `${f2(r.worst.rotErr)}°`} (참고)</span>
             </>
           ) : (
             <span class="v">—</span>
@@ -261,16 +262,16 @@ function ReportSheet(p: { rep: Report; printedAt: number; zoom: number; onOverfl
         <Fig cls="psa-fa" kind="fa" label="PSA · B (F/A)" desc="③ 주판 · ④⑤와 평행" />
       </div>
 
-      <Band n={3} title="캡별 결과" right="회전오차 = B 실측으로 역산한 실제 δ − 도면 δ (외판 위 각도)" />
+      <Band n={3} title="캡별 결과" right={`판정 = A · B 실측과 정상값 비교 (±${fmt(r.tol, 1)}°) · 역산 회전은 참고`} />
       {lv < 3 ? (
         <table class="rpt-res">
           <thead>
             <tr>
               <th class="l">캡</th>
               <th>도면 δ</th>
-              <th>B 정상 → 실측 (높은 쪽)</th>
-              <th>A 정상 → 실측</th>
-              <th class="l">회전오차</th>
+              <th>B 정상 → 실측 (높은 쪽) · 편차</th>
+              <th>A 정상 → 실측 · 편차</th>
+              <th class="l">역산 회전 (참고)</th>
               <th>판정</th>
             </tr>
           </thead>
@@ -289,8 +290,8 @@ function ReportSheet(p: { rep: Report; printedAt: number; zoom: number; onOverfl
                 <tr>
                   <th class="l">캡</th>
                   <th>도면 δ</th>
-                  <th>B 실측</th>
-                  <th class="l">회전오차</th>
+                  <th>B 편차</th>
+                  <th class="l">역산 회전 (참고)</th>
                   <th>판정</th>
                 </tr>
               </thead>
@@ -358,6 +359,14 @@ function Checks(p: { rep: Report }) {
   if (r.noShellCaps.length) {
     lines.push({ kind: 'warn', text: `${r.noShellCaps.join(', ')} : 캡 자리 외판 기울기 없이 계산 — 서 있는 외판이면 회전오차가 크게 틀릴 수 있어요` });
   }
+  if (r.caution > 0) {
+    lines.push({
+      kind: 'warn',
+      text: r.lowTa
+        ? `주의 ${r.caution}개 : T.A 24° 미만 블록이라 B 오차가 역산 회전각에 크게 부풀려져요 — 합격 · 불합격은 A · B 현물 비교 기준`
+        : `주의 ${r.caution}개 : A · B 는 허용오차 안, 역산 회전각이 허용오차를 넘거나 풀리지 않음 — 캡 회전 재확인`,
+    });
+  }
   if (r.turned) {
     lines.push({ kind: 'ok', text: '턴오버 후 확인 — 지주캡이 하늘을 보는 자세로 캡 방향을 계산했어요' });
   }
@@ -411,24 +420,34 @@ function ResRow(p: { row: ReportRow; compact?: boolean }) {
     );
   }
   const v = x.verdict;
-  const cls = v === 'OK' ? 'ok' : v === 'NG' ? 'ng' : 'none';
-  const vText = v === 'OK' || v === 'NG' ? v : v === '기준미정' ? '미정' : '보류';
+  const cls = v === 'OK' ? 'ok' : v === 'NG' ? 'ng' : v === '주의' ? 'warn' : 'none';
+  const vText = v === 'OK' || v === 'NG' || v === '주의' ? v : '보류';
   // '선수 쪽으로 0.74° 덜 돌아감' → '선수 쪽으로 덜 돌아감' (좁으면 '선수 쪽 덜')
   let rest = x.rotText?.replace(/ [\d.]+°/, '') ?? '';
   if (c) rest = rest.replace('으로', '').replace(' 돌아감', '');
   const high = x.highB ? dirName(x.highB) + '↑' : '수평';
   return (
-    <tr class={cls === 'ng' ? 'isng' : x.dirWarn ? 'iswarn' : ''}>
+    <tr class={cls === 'ng' ? 'isng' : x.dirWarn || cls === 'warn' ? 'iswarn' : ''}>
       <td class="capno">{x.capNo}</td>
       <td>{dTxt}</td>
       <td>
-        <span class="val">{c ? `${f2(x.measB)}°` : `${f2(x.normalB)} → ${f2(x.measB)}°`}</span> <span class="rpt-sub s">{high}</span>
+        {c ? (
+          <span class="val">{f2(x.errB)}°</span>
+        ) : (
+          <>
+            <span class="val">
+              {f2(x.normalB)} → {f2(x.measB)}°
+            </span>{' '}
+            <span class="rpt-sub s">{high}</span> <b class="dev">{f2(x.errB)}°</b>
+          </>
+        )}
       </td>
       {!c && (
         <td>
           <span class="val">
             {f2(x.normalA)} → {f2(x.measA)}°
-          </span>
+          </span>{' '}
+          <b class="dev">{fmtSigned(x.errA, 2)}°</b>
         </td>
       )}
       <td class="l nowrap">
@@ -436,7 +455,7 @@ function ResRow(p: { row: ReportRow; compact?: boolean }) {
           <span class="rpt-sub">{x.rotText}</span>
         ) : (
           <>
-            <span class={'rot' + (cls === 'ng' ? ' ng' : '')}>{f2(x.rotErr)}°</span> <span class="rpt-sub s">{x.dirWarn ? '방향 확인' : rest}</span>
+            <span class={'rot' + (cls === 'warn' ? ' warn' : '')}>{f2(x.rotErr)}°</span> <span class="rpt-sub s">{x.dirWarn ? '방향 확인' : rest}</span>
           </>
         )}
       </td>

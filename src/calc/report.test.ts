@@ -14,10 +14,10 @@ const t0 = new Date(2026, 10, 22, 9, 12).getTime();
 const block: Block = { id: 'b', ship: 'S1', block: 'X01', ta: TA, fa: FA, faDir: FA_DIR, refTa: 10.2, refFa: 4.9, refFaDir: FA_DIR, memo: '', createdAt: 0, updatedAt: 0 };
 const cap = (id: string, no: string, delta: number, dir: Dir): Cap => ({ id, blockId: 'b', no, delta, dir, createdAt: 0 });
 
-/** 캡이 err° 만큼 더 돌아갔을 때의 기록 */
-function rec(c: Cap, err: number, at: number, extra: Partial<MeasureRecord> = {}): MeasureRecord {
+/** 캡이 err° 만큼 더 돌아갔을 때의 기록 (bOff = B 를 그만큼 더 잘못 잼) */
+function rec(c: Cap, err: number, at: number, extra: Partial<MeasureRecord> = {}, bOff = 0): MeasureRecord {
   const s = calcDir(capDirOf(c.delta, c.dir), FA_DIR);
-  const mB = thetaB(TA, FA, c.delta + err, s);
+  const mB = thetaB(TA, FA, c.delta + err, s) + bOff;
   const mA = thetaA(TA, FA, c.delta + err, s);
   const n = capNormalDir(TA, FA, FA_DIR, c.delta, c.dir);
   const a = analyzeCapDir(TA, FA, FA_DIR, c.delta, c.dir, mA, mB);
@@ -28,7 +28,7 @@ function rec(c: Cap, err: number, at: number, extra: Partial<MeasureRecord> = {}
   };
 }
 
-const settings = { ...DEFAULTS, rotTol: 1 };
+const settings = { ...DEFAULTS, capTol: 1 };
 
 describe('지주캡 보고서 정리', () => {
   const c1 = cap('c1', 'TS1', 0, 1);
@@ -36,16 +36,21 @@ describe('지주캡 보고서 정리', () => {
   const c10 = cap('c10', 'TS10', 7, -1);
   const c3 = cap('c3', 'PSA1', 12, 1);
 
-  it('캡마다 최근 기록 하나, 지금 허용값으로 판정, 캡 번호 순', () => {
-    const recs = [rec(c1, 2, t0), rec(c1, 0.3, t0 + 60_000), rec(c2, -1.5, t0 + 120_000), rec(c10, 0.4, t0 + 180_000)];
+  it('캡마다 최근 기록 하나, 지금 허용값으로 A · B 판정 (OK / 주의 / NG), 캡 번호 순', () => {
+    // T.A 10° 블록 : 캡이 1.5° 돌아도 B 는 0.26° 만 변해 A · B 는 안 → 역산 회전만 넘어 '주의'
+    const recs = [rec(c1, 2, t0), rec(c1, 0.3, t0 + 60_000), rec(c2, -1.5, t0 + 120_000), rec(c10, 0.4, t0 + 180_000, {}, 1.6)];
     const r = buildReport(block, [c10, c2, c1, c3], recs, settings);
     expect(r.rows.map((x) => x.capNo)).toEqual(['PSA1', 'TS1', 'TS2', 'TS10']);
     expect(r.rows[0].measured).toBe(false); // PSA1 미측정
     expect(r.rows[1].rotErr).toBeCloseTo(0.3, 6); // TS1 은 두 번째 기록
     expect(r.rows[1].verdict).toBe('OK');
-    expect(r.rows[2].verdict).toBe('NG');
-    expect({ caps: r.caps, measured: r.measured, ok: r.ok, ng: r.ng }).toEqual({ caps: 4, measured: 3, ok: 2, ng: 1 });
-    expect(r.worst?.capNo).toBe('TS2');
+    expect(r.rows[2].verdict).toBe('주의');
+    expect(r.rows[2].caution).toContain('T.A 24° 미만');
+    expect(r.rows[3].verdict).toBe('NG'); // B 를 1.6° 더 높게 잼
+    expect({ caps: r.caps, measured: r.measured, ok: r.ok, caution: r.caution, ng: r.ng }).toEqual({ caps: 4, measured: 3, ok: 1, caution: 1, ng: 1 });
+    expect(r.worst?.capNo).toBe('TS10'); // A · B 편차가 가장 큰 캡
+    expect(r.tol).toBe(1);
+    expect(r.lowTa).toBe(true);
     expect(r.from).toBe(t0 + 60_000);
     expect(r.to).toBe(t0 + 180_000);
   });
@@ -67,13 +72,14 @@ describe('지주캡 보고서 정리', () => {
     expect(buildReport({ ...block, refTa: undefined, refFa: undefined }, [c1], [], settings).taDiff).toBeNull();
   });
 
-  it('허용값이 없으면 기준미정, 1.2.0 전 기록은 빼고 센다', () => {
+  it('허용오차 기본값 ±3°, 1.2.0 전 기록은 빼고 센다', () => {
     const legacy = { ...rec(c2, 0.1, t0), faDir: undefined, highB: undefined };
     const r = buildReport(block, [c1, c2], [rec(c1, 0.2, t0), legacy], DEFAULTS);
-    expect(r.rows[0].verdict).toBe('기준미정');
+    expect(r.tol).toBe(3);
+    expect(r.rows[0].verdict).toBe('OK');
     expect(r.rows[1].measured).toBe(false);
     expect(r.skippedLegacy).toBe(1);
-    expect(r.undecided).toBe(1);
+    expect(r.undecided).toBe(0);
   });
 
   it('캡 방향이 반대로 들어간 것 같으면 판정 보류', () => {

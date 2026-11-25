@@ -4,11 +4,12 @@
  * 블록 · 캡 · 기록을 받아 캡마다 가장 최근 기록 하나로 표를 만든다.
  *  - 1.2.0 전 기록(방향 없이 계산)은 빼고 몇 건 뺐는지만 알린다.
  *  - 기록이 없는 캡은 '미측정' 줄로 남겨 빠진 캡이 보이게 한다.
- *  - 판정은 지금 설정의 허용 회전오차로 다시 매긴다 (보고서에 적힌 허용값과 맞게).
+ *  - 판정은 지금 설정의 합격 허용오차로 다시 매긴다 (보고서에 적힌 허용값과 맞게).
+ *    1.7.0 : 판정 = A · B 현물 비교 (OK / 주의 / NG), 역산 회전오차는 참고.
  */
 import type { Dir } from './angle';
 import { basisName, designSlope, effectiveAngles, hasDesign, hasRef, type Basis } from './basis';
-import { capVerdict, isLegacyCap, latestPerCap, sameSignWarning } from './judge';
+import { LOW_TA, capJudge, cautionText, isLegacyCap, latestPerCap, sameSignWarning } from './judge';
 import { capDirOf, dirSuspect, highOfB, rotText, rotToBow } from './sign';
 import type { Block, Cap, MeasureRecord, Verdict } from '../db/store';
 import type { Settings } from '../settings';
@@ -23,10 +24,13 @@ export interface ReportRow {
   highB?: Dir | null; // 실측 B 높은 쪽 (거의 수평이면 null)
   normalA?: number;
   measA?: number;
+  errA?: number; // A 실측 − 정상
+  errB?: number; // B 실측 − 정상 (계산용 부호)
   rotErr?: number | null; // 계산용 부호 (역산 못 하면 null)
   rotBow?: number | null; // 선수 쪽으로 돌았으면 +
   rotText?: string; // '선수 쪽으로 0.35° 돌아감'
   verdict?: Verdict;
+  caution?: string; // 주의 사유
   dirWarn?: boolean; // 캡 · F.A 방향이 반대로 들어간 것 같음
   shell?: number; // 계산에 쓴 캡 자리 외판 기울기
   noShell?: boolean; // δ 가 있는데 외판 기울기 없이 계산한 기록
@@ -56,10 +60,12 @@ export interface Report {
   caps: number; // 블록에 등록된 캡 수
   measured: number;
   ok: number;
+  caution: number; // 주의 (A · B 는 안, 역산 회전 이상)
   ng: number;
-  undecided: number; // 기준미정 · 판정불가
-  worst: ReportRow | null; // 회전오차가 가장 큰 캡
-  tol: number | null;
+  undecided: number; // 판정불가 (방향 보류)
+  worst: ReportRow | null; // A · B 편차가 가장 큰 캡
+  tol: number;
+  lowTa: boolean; // T.A 24° 미만 — 역산 회전이 크게 부풀려지는 블록
   aMaxDiff: number | null; // max |A 실측 − 정상|
   aOk: boolean | null; // A 가 정상값과 다 맞는가 (A 잔차 경고 기준 안)
   dirWarnCaps: string[];
@@ -90,6 +96,7 @@ export function buildReport(block: Block, caps: Cap[], records: MeasureRecord[],
     const g = { shell: r.shell, up: r.up }; // 그 기록을 계산한 조건 그대로
     const dw =
       r.measA != null && r.ta != null && r.fa != null ? dirSuspect(r.ta, r.fa, faDir, delta, r.dir ?? c.dir, r.measA, g) != null : false;
+    const j = r.errA != null && r.errB != null ? capJudge(r.errA, r.errB, rot, r.ta, s.capTol) : null;
     return {
       capNo: r.capNo ?? c.no,
       delta,
@@ -100,10 +107,13 @@ export function buildReport(block: Block, caps: Cap[], records: MeasureRecord[],
       highB: r.measB != null ? r.highB ?? highOfB(r.measB, faDir) : null,
       normalA: r.normalA,
       measA: r.measA,
+      errA: r.errA,
+      errB: r.errB,
       rotErr: rot,
       rotBow: rot == null ? null : rotToBow(rot, delta, dir),
       rotText: rot == null ? '역산 불가' : rotText(rot, delta, dir),
-      verdict: dw ? '판정불가' : capVerdict(rot, s),
+      verdict: dw || !j ? '판정불가' : j.verdict,
+      caution: !dw && j ? cautionText(j) || undefined : undefined,
       dirWarn: dw,
       shell: r.shell,
       noShell: Math.abs(delta) >= 1e-9 && r.shell == null,
@@ -114,8 +124,10 @@ export function buildReport(block: Block, caps: Cap[], records: MeasureRecord[],
 
   const m = rows.filter((r) => r.measured);
   const times = m.map((r) => r.at!);
-  const withRot = m.filter((r) => r.rotErr != null && !r.dirWarn);
-  const worst = withRot.length ? withRot.reduce((a, r) => (Math.abs(r.rotErr!) > Math.abs(a.rotErr!) ? r : a)) : null;
+  const dev = (r: ReportRow) => Math.max(Math.abs(r.errA!), Math.abs(r.errB!));
+  const withDev = m.filter((r) => r.errA != null && r.errB != null && !r.dirWarn);
+  const worst = withDev.length ? withDev.reduce((a, r) => (dev(r) > dev(a) ? r : a)) : null;
+  const lastTa = [...latest.values()].sort((a, b) => b.createdAt - a.createdAt)[0]?.ta;
   const aDiffs = m.filter((r) => r.measA != null && r.normalA != null).map((r) => Math.abs(Math.abs(r.measA!) - Math.abs(r.normalA!)));
   const aMaxDiff = aDiffs.length ? Math.max(...aDiffs) : null;
 
@@ -143,10 +155,12 @@ export function buildReport(block: Block, caps: Cap[], records: MeasureRecord[],
     caps: caps.length,
     measured: m.length,
     ok: m.filter((r) => r.verdict === 'OK').length,
+    caution: m.filter((r) => r.verdict === '주의').length,
     ng: m.filter((r) => r.verdict === 'NG').length,
-    undecided: m.filter((r) => r.verdict !== 'OK' && r.verdict !== 'NG').length,
+    undecided: m.filter((r) => r.verdict !== 'OK' && r.verdict !== 'NG' && r.verdict !== '주의').length,
     worst,
-    tol: s.rotTol,
+    tol: s.capTol,
+    lowTa: lastTa != null && Math.abs(lastTa) < LOW_TA,
     aMaxDiff,
     aOk: aMaxDiff == null ? null : aMaxDiff <= s.aResidTol + 1e-9 && !m.some((r) => r.dirWarn),
     dirWarnCaps: m.filter((r) => r.dirWarn).map((r) => r.capNo),

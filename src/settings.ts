@@ -6,7 +6,7 @@ export type Theme = 'system' | 'light' | 'dark';
 export interface Settings {
   tol1: number; // 일반 편차 1단계 (녹색)
   tol2: number; // 일반 편차 2단계 (주황)
-  rotTol: number | null; // 허용 회전오차 (없으면 기준미정)
+  capTol: number; // 지주캡 합격 허용오차 (°) — A · B 편차와 역산 회전 이상 판단에 같이 쓴다 (1.7.0)
   aResidTol: number; // A 잔차 경고 기준
   aSensMin: number; // A 민감도 하한 (dA 가 이보다 작으면 A 는 참고)
   decimals: 1 | 2;
@@ -21,7 +21,7 @@ export interface Settings {
 export const DEFAULTS: Settings = {
   tol1: 0.5,
   tol2: 1.0,
-  rotTol: null,
+  capTol: 3.0,
   aResidTol: 0.5,
   aSensMin: 0.3,
   decimals: 1,

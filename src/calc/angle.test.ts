@@ -15,14 +15,13 @@ import {
   longlDev,
   rotText,
   rotToBow,
-  shellDeltaOk,
   signedA,
   signedB,
   type CapGeom,
 } from './sign';
-import { fmt, fmtSigned, isLegacyCap, sameSignWarning } from './judge';
+import { capJudge, cautionText, fmt, fmtSigned, isLegacyCap, rotScale, sameSignWarning } from './judge';
 import { CSV_HEADER, recordsToCsv } from './csv';
-import { capGeom, recalcCapRecord } from './capcalc';
+import { capGeom, capResult, recalcCapRecord } from './capcalc';
 import type { Block, Cap, MeasureRecord } from '../db/store';
 import { DEFAULTS } from '../settings';
 
@@ -236,8 +235,8 @@ describe('방향 실수 점검', () => {
   });
 
   it('높은 쪽이 판정을 가르는 캡 : PSA(정상 B 0.74°) 예, TS(정상 B 3.23°) 아니오', () => {
-    expect(highSensitive(34.41, 3.23, -1, 7, -1, null)).toBe(true);
-    expect(highSensitive(34.41, 3.23, -1, 0, 1, null)).toBe(false);
+    expect(highSensitive(34.41, 3.23, -1, 7, -1, 3)).toBe(true);
+    expect(highSensitive(34.41, 3.23, -1, 0, 1, 3)).toBe(false);
   });
 
   it('PSA 실제 −4° 를 바르게 넣으면 NG 그대로, 반대쪽 결과(+1.39)는 비교용으로만', () => {
@@ -289,32 +288,55 @@ describe('방향 실수 점검', () => {
 });
 
 // ── 1.6.0 (2026-11-24 현장 분석) : 외판 기울기 · 도면 T.A 경사 · 턴오버
+// ── 1.7.0 : 외판 기울기 보정을 정확식 tan δ외판 = tan δ상판 · cos θ 로
 describe('외판 기울기 보정 (도면 δ = 외판 면 위 각도)', () => {
+  it('작업지시서 1.7.0 1번 표 : 정확식 δc 와 0.01° 안', () => {
+    near(capDeltaFromShell(3, 73), 10.16);
+    near(capDeltaFromShell(7, 55), 12.08);
+    near(capDeltaFromShell(10, 73), 31.09);
+    near(capDeltaFromShell(20, 60), 36.05);
+    near(capDeltaFromShell(17, 73), 46.28); // 1.6.0 에서는 계산 불가
+  });
+
   it('외판이 누워 있으면(0°) 그대로, 서 있을수록 상판 각도가 커진다', () => {
     expect(capDeltaFromShell(7, 0)).toBeCloseTo(7, 9);
-    near(capDeltaFromShell(7, 43.5), 9.67);
-    near(capDeltaFromShell(5, 54.5), 8.63);
-    near(capDeltaFromShell(7, 55), 12.27);
-    near(capDeltaFromShell(3, 73), 10.31);
-    near(capDeltaFromShell(2, 71.5), 6.31);
+    near(capDeltaFromShell(7, 43.5), 9.61);
+    near(capDeltaFromShell(5, 54.5), 8.57);
+    near(capDeltaFromShell(2, 71.5), 6.28);
   });
 
-  it('거꾸로 바꾸면 제자리 · 부호 유지 · δ ≥ 90° − θ 는 불가능', () => {
-    for (const th of [0, 20, 45, 60, 73, 85])
-      for (const d of [-4, -1, 0.5, 2, 3, 4.9]) {
-        if (Math.abs(d) >= 90 - th) continue;
-        expect(shellDeltaFromCap(capDeltaFromShell(d, th), th)).toBeCloseTo(d, 9);
+  it('3차원 모형으로 확인 : 연직 WEB 면과 외판 면이 만나는 선이 외판 위 δ', () => {
+    for (const th of [0, 20, 43.5, 60, 73, 85])
+      for (const dc of [1, 7, 20, 45, 70, 89]) {
+        // FR 단면 (y 바깥 · z 위), x 선수. 외판 = x 축과 접선 t 를 담는 면, WEB = 상판에서 dc 돌아간 연직면
+        const t = [0, cd(th), sd(th)];
+        const n = [cd(dc), -sd(dc), 0]; // WEB 면의 법선
+        // 외판 위 방향 a·x + b·t 가 WEB 면 안 : a·n0 + b·(t·n) = 0
+        const a = -(t[0] * n[0] + t[1] * n[1] + t[2] * n[2]);
+        const b = n[0];
+        const onShell = Math.atan2(a, b) / D2R; // 외판 위에서 FR 선(t)과 이루는 각
+        expect(capDeltaFromShell(onShell, th)).toBeCloseTo(dc, 9);
       }
-    expect(capDeltaFromShell(-3, 73)).toBeCloseTo(-capDeltaFromShell(3, 73), 9);
-    expect(capDeltaFromShell(17.5, 73)).toBeNaN();
-    expect(shellDeltaOk(17.5, 73)).toBe(false);
-    expect(shellDeltaOk(3, 73)).toBe(true);
-    expect(shellDeltaOk(30, null)).toBe(true);
   });
 
-  it('작은 δ 는 대략 δ ÷ cos θ, 도면 1° 당 상판 회전도 1 ÷ cos θ', () => {
-    near(shellScale(0, 60), 2, 1e-4);
-    near(shellScale(0, 73), 1 / Math.cos((73 * Math.PI) / 180), 1e-4);
+  it('거꾸로 바꾸면 제자리 · 부호 유지 · 모든 δ 에서 계산 (θ = 90° 만 불가)', () => {
+    for (const th of [0, 20, 45, 60, 73, 85, 89.9])
+      for (const d of [-40, -4, -1, 0.5, 2, 3, 4.9, 17, 30, 60, 89])
+        expect(shellDeltaFromCap(capDeltaFromShell(d, th), th)).toBeCloseTo(d, 9);
+    expect(capDeltaFromShell(-3, 73)).toBeCloseTo(-capDeltaFromShell(3, 73), 9);
+    expect(capDeltaFromShell(17.5, 73)).not.toBeNaN();
+    expect(capDeltaFromShell(3, 90)).toBeNaN();
+  });
+
+  it('k = dδc/dδ : 식 값이 수치 미분과 같고, δ 0 이면 1 ÷ cos θ', () => {
+    near(shellScale(0, 60), 2, 1e-9);
+    near(shellScale(0, 73), 1 / Math.cos((73 * Math.PI) / 180), 1e-9);
+    expect(shellScale(5, 0)).toBeCloseTo(1, 9);
+    for (const [d, th] of [[3, 73], [7, 55], [17, 73], [40, 30]]) {
+      const h = 1e-4;
+      const num = (capDeltaFromShell(d + h, th) - capDeltaFromShell(d - h, th)) / (2 * h);
+      near(shellScale(d, th), num, 1e-6);
+    }
   });
 
   it('δ 0 캡 · 외판 기울기 없음은 예전 계산과 같다', () => {
@@ -324,6 +346,12 @@ describe('외판 기울기 보정 (도면 δ = 외판 면 위 각도)', () => {
     const b = analyzeCapDir(34.41, 3.23, -1, 7, -1, 34.6, 0.5, { shell: null, up: false });
     expect(b.rotErr).toBe(a.rotErr);
     expect(b.deltaCap).toBe(7);
+  });
+
+  it('δ 17 · 외판 73 도 막히지 않고 정상값 · 1°당 변화가 나온다', () => {
+    const n = capNormalDir(46.66, 13.42, 1, 17, -1, { shell: 73 });
+    near(n.deltaCap, 46.28);
+    expect(isFinite(n.thetaA) && isFinite(n.thetaB) && isFinite(n.dA) && isFinite(n.dB)).toBe(true);
   });
 });
 
@@ -373,9 +401,8 @@ describe('턴오버 · 외판 기울기 실물 모형', () => {
           for (const capDir of [1, -1] as Dir[])
             for (const up of [false, true])
               for (const shell of [0, 30, 55, 73])
-                for (const delta of [2, 3, 7])
+                for (const delta of [2, 3, 7, 17])
                   for (const rot of [-1, -0.3, 0, 0.3, 1]) {
-                    if (delta + 1 >= 90 - shell) continue;
                     const g = { shell, up };
                     const dReal = shell > 0 ? capDeltaFromShell(delta + rot, shell) : delta + rot;
                     const t = model(TA, FA, faDir, up, dReal, capDir);
@@ -397,22 +424,22 @@ describe('턴오버 · 외판 기울기 실물 모형', () => {
     // 턴오버만 넣으면 방향은 맞지만 6° 더 돈 것처럼 보인다
     expect(dirSuspect(46.66, 13.42, 1, 3, -1, 48.1, { up: true })).toBeNull();
     near(analyzeCapDir(46.66, 13.42, 1, 3, -1, 48.1, mB, { up: true }).rotErr!, 6.22);
-    // 외판 기울기까지 넣으면 도면 3° 에 0.3° 차이
+    // 외판 기울기까지 넣으면 도면 3° 에 0.3° 차이 (1.7.0 정확식 : 상판 10.16°, 1.6.0 근사식은 10.31°)
     const r = analyzeCapDir(46.66, 13.42, 1, 3, -1, 48.1, mB, { up: true, shell: 73 });
-    near(r.deltaCap, 10.31);
-    near(r.deltaReal!, 2.69);
-    near(r.rotErr!, -0.31);
+    near(r.deltaCap, 10.16);
+    near(r.deltaReal!, 2.72);
+    near(r.rotErr!, -0.28);
   });
 
   it('외판 BASE 캡도 외판 기울기를 넣으면 \'도면보다 더 돌아감\' 이 사라진다 (2026-11-24 현장값)', () => {
     // 도면 T.A 34.41 · F.A 3.23 선미, δ 7 선미, 외판 43.5°, 실측 A 35.09 · B 2.27 선미 높음
     const mB = signedB(2.27, -1, -1);
     near(analyzeCapDir(34.41, 3.23, -1, 7, -1, 35.09, mB).rotErr!, 2.69);
-    near(analyzeCapDir(34.41, 3.23, -1, 7, -1, 35.09, mB, { shell: 43.5 }).rotErr!, 0.01);
+    near(analyzeCapDir(34.41, 3.23, -1, 7, -1, 35.09, mB, { shell: 43.5 }).rotErr!, 0.06); // 1.6.0 근사식은 0.01
   });
 
   it('지난 기록 다시 계산 : 잰 값은 그대로, 조건만 새로', () => {
-    const settings = { ...DEFAULTS, rotTol: 2 };
+    const settings = { ...DEFAULTS, capTol: 2 };
     const mB = signedB(6.46, -1, 1);
     const old = {
       id: 'r', createdAt: 0, blockId: 'b', ship: 'S', block: 'B', ta: 46.66, fa: 13.42, faDir: 1, basis: 'ref', mode: 'cap',
@@ -423,8 +450,8 @@ describe('턴오버 · 외판 기울기 실물 모형', () => {
     const r = recalcCapRecord(old, cap, block, settings)!;
     expect(r.changed).toBe(true);
     expect(r.suspect).toBe(false);
-    expect(r.next).toMatchObject({ measA: 48.1, measB: mB, highB: -1, shell: 73, up: true, verdict: 'OK', calcRev: 2 });
-    near(r.next.rotErr!, -0.31);
+    expect(r.next).toMatchObject({ measA: 48.1, measB: mB, highB: -1, shell: 73, up: true, verdict: 'OK', calcRev: 3, tol: 2 });
+    near(r.next.rotErr!, -0.28);
     // 이미 새 방식으로 계산했고 조건이 같으면 다시 계산할 게 없다
     expect(recalcCapRecord(r.next, cap, block, settings)!.changed).toBe(false);
     // 1.6.0 전 도면 기준 기록은 T.A 를 경사로 바꾼다

@@ -60,11 +60,6 @@ export function capDelta(delta: number, g?: CapGeom): number {
   return usesShell(delta, g) ? capDeltaFromShell(delta, g.shell) : delta;
 }
 
-/** 외판 기울기 θ 에서 도면 δ 가 가능한 값인가 (δ < 90° − θ) */
-export function shellDeltaOk(delta: number, shell: number | null | undefined): boolean {
-  return shell == null || Math.abs(delta) < 1e-9 || isFinite(capDeltaFromShell(delta, shell));
-}
-
 /**
  * δ = 0 캡은 돌아간 방향이 뜻이 없다 → 늘 선수(+1)로 계산해서
  * 회전오차 + 가 언제나 '선수 쪽으로 돌아감' 이 되게 한다.
@@ -166,18 +161,13 @@ export function leanFromFace(face: number, facing: Dir): Dir | null {
   return face > 0 ? facing : (-facing as Dir);
 }
 
-/** 정상값 비교 등에서 쓰는 허용 한계 (허용 회전오차가 없으면 2°) */
-export const rotLimit = (tol: number | null | undefined) => Math.max(tol ?? 2, 1);
-
 /**
- * 높은 쪽이 판정을 가르는 캡인가 — 정상 B 를 반대쪽으로 넣었을 때의 회전오차가 작으면,
- * 높은 쪽 착오가 '그럴듯한 회전오차'로 보여 걸러낼 수 없다 (PSA 캡처럼 정상 B 가 거의 수평).
+ * 높은 쪽이 판정을 가르는 캡인가 (1.7.0 : B 편차 기준) — 높은 쪽을 반대로 고르면 B 편차가 약 2 × 정상 B 가 된다.
+ * 정상 B 가 허용오차보다 작으면 (PSA 캡처럼 거의 수평) 높은 쪽 착오가 허용오차 안에 숨어 걸러낼 수 없다.
  */
-export function highSensitive(ta: number, fa: number, faDir: Dir, delta: number, capDir: Dir, tol: number | null | undefined, g?: CapGeom): boolean {
+export function highSensitive(ta: number, fa: number, faDir: Dir, delta: number, capDir: Dir, tol: number, g?: CapGeom): boolean {
   const n = capNormalDir(ta, fa, faDir, delta, capDir, g);
-  if (Math.abs(n.thetaB) < 0.005) return true;
-  const inv = analyzeCapDir(ta, fa, faDir, delta, capDir, n.thetaA, -n.thetaB, g);
-  return inv.rotErr == null || Math.abs(inv.rotErr) <= 2.5 * rotLimit(tol);
+  return Math.abs(n.thetaB) <= Math.abs(tol) + 1e-9;
 }
 
 export interface DirSuspect {
@@ -230,14 +220,12 @@ export function longlDev(mag: number, high: Dir | null, faDir: Dir, fa: number):
 }
 
 /**
- * 높은 쪽을 반대로 골랐을 가능성 — 반대로 넣으면 회전오차가 확 줄어드는 경우.
- * 돌려주는 값 = 반대로 넣었을 때의 회전오차 (의심 없으면 null)
+ * 높은 쪽을 반대로 골랐을 가능성 (1.7.0 : B 편차 기준) — 지금은 B 편차가 허용오차를 넘는데
+ * 반대로 넣으면 허용오차 안으로 확 줄어드는 경우. 돌려주는 값 = 반대로 넣었을 때의 B 편차 (의심 없으면 null)
  */
-export function flipSuspect(cur: CapAnalysis, flipped: CapAnalysis, tol: number | null): number | null {
-  if (flipped.rotErr == null) return null;
-  const lim = Math.max(tol ?? 2, 1);
-  if (Math.abs(flipped.rotErr) > lim) return null;
-  if (cur.rotErr == null) return flipped.rotErr;
-  if (Math.abs(cur.rotErr) <= lim) return null;
-  return Math.abs(flipped.rotErr) + 1 < Math.abs(cur.rotErr) ? flipped.rotErr : null;
+export function flipSuspect(cur: CapAnalysis, flipped: CapAnalysis, tol: number): number | null {
+  const lim = Math.abs(tol);
+  if (Math.abs(flipped.errB) > lim) return null;
+  if (Math.abs(cur.errB) <= lim) return null;
+  return Math.abs(flipped.errB) + 1 < Math.abs(cur.errB) ? flipped.errB : null;
 }

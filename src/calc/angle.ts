@@ -152,29 +152,35 @@ export function blockAnglesLookRight(TA: number, FA: number): boolean {
  * 6) 외판 기울기 보정 — 도면 δ(외판 면 위) ↔ 캡 상판 δ(수평면)
  * 캡취부각도는 외판을 정면에서 본 그림이라, δ 는 외판에 그은 FR 선과 캡 중심선 사이 각이다.
  * 캡 WEB 은 수직판이라 외판이 서 있을수록 외판 위에서는 덜 돌아간 것처럼 보인다 (문을 열어도 경첩 선은 세로).
- * shell θ = 캡이 있는 FR 단면에서 외판 접선과 A/B 수평선 사이 각 (0 ≤ θ < 90). 캡 WEB 은 외판 물매 방향과 나란하다고 본다.
- *   tan δ상판 = tan δ외판 / √(cos²θ − tan²δ외판 · sin²θ)
- *   tan δ외판 = sin δ상판 / √(cos²δ상판 + tan²θ)
- * δ외판 은 90° − θ 보다 작아야 한다 (그보다 크면 기하적으로 불가능 → NaN).
+ * shell θ = 캡이 있는 FR 단면에서 외판 접선과 A/B 수평선 사이 각 (0 ≤ θ < 90). WEB 은 연직.
+ *
+ * 1.7.0 정확식 (1.6.0 근사식은 δ 가 커지면 틀어지고, δ ≥ 90° − θ 에서 계산이 안 됐다) :
+ *   tan δ외판 = tan δ상판 · cos θ
+ * θ < 90° 이면 모든 δ(0~90°)에서 계산된다. θ = 90° 는 cos 0 나눗셈이라 NaN.
+ *
+ * 외판 길이방향(선수미 방향) 기울기는 계산에서 뺀다 —
+ * 길이방향 기울기 20°까지 영향 0.2° 이하, 30°에서 약 0.5° – 현장 판정에 지장 없음.
  */
 export function capDeltaFromShell(delta: number, shell: number): number {
-  const t = Math.tan(delta * D2R);
-  const q = cos(shell) ** 2 - t * t * sin(shell) ** 2;
-  if (!(q > 0)) return NaN;
-  return Math.atan(t / Math.sqrt(q)) * R2D;
+  const c = cos(shell);
+  if (!(c > 1e-12)) return NaN;
+  return Math.atan(Math.tan(delta * D2R) / c) * R2D;
 }
 
 export function shellDeltaFromCap(deltaCap: number, shell: number): number {
-  return Math.atan(sin(deltaCap) / Math.sqrt(cos(deltaCap) ** 2 + Math.tan(shell * D2R) ** 2)) * R2D;
+  return Math.atan(Math.tan(deltaCap * D2R) * cos(shell)) * R2D;
 }
 
-/** 외판 기울기 θ 에서 넣을 수 있는 도면 δ 의 끝 (미만) */
-export const maxShellDelta = (shell: number) => 90 - shell;
-
-/** 도면 δ 1° 가 캡 상판에서 몇 ° 인지 (dA · dB 를 도면 각도 1° 당으로 바꿀 때) */
+/**
+ * 도면 δ 1° 가 캡 상판에서 몇 ° 인지 (dA · dB 를 도면 각도 1° 당으로 바꿀 때)
+ *   k = dδc/dδ = (1/cosθ) · (1/cos²δ) ÷ (1 + tan²δc)
+ */
 export function shellScale(delta: number, shell: number): number {
-  const h = 0.01;
-  return (capDeltaFromShell(delta + h, shell) - capDeltaFromShell(delta - h, shell)) / (2 * h);
+  const c = cos(shell);
+  if (!(c > 1e-12)) return NaN;
+  const t = Math.tan(delta * D2R);
+  const tc = t / c;
+  return (1 / c) * (1 + t * t) / (1 + tc * tc);
 }
 
 /**

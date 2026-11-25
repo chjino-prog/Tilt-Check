@@ -44,7 +44,7 @@ export interface MeasureRecord {
   faDir?: Dir; // 계산에 쓴 F.A 방향 (예전 기록은 없음 = 선수)
   basis?: Basis; // 그때 쓴 기준 (예전 기록은 없음 = 도면)
   mode: 'cap' | 'line';
-  calcRev?: number; // 계산 방식 : 2 = 1.6.0 (외판 기울기 · 턴오버 · 도면 T.A 경사). 없으면 그 전
+  calcRev?: number; // 계산 방식 : 2 = 1.6.0 (외판 기울기 · 턴오버 · 도면 T.A 경사), 3 = 1.7.0 (외판 정확식 · A·B 판정). 없으면 그 전
   recalcAt?: number; // 잰 값은 그대로 두고 새 계산으로 다시 계산한 시각
   // 지주캡
   capId?: string;
@@ -65,6 +65,10 @@ export interface MeasureRecord {
   deltaReal?: number | null; // 실제 δ (외판 위 각도, 도면 δ 와 비교)
   rotErr?: number | null; // 회전오차 = 실제 δ − 도면 δ
   aResid?: number | null;
+  // 1.7.0 판정 (A · B 현물 비교, 역산 회전은 참고)
+  tol?: number; // 그 측정 때의 합격 허용오차 (°)
+  rotScale?: number; // 회전 환산 배율 1 / sin(T.A)
+  caution?: string; // 주의 사유 (주의일 때만)
   // 일반 부재
   lineLabel?: string; // FRAME 방향 / LONGL. 방향 / 임의각 ψ=…
   normal?: number;
