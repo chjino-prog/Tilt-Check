@@ -2,8 +2,9 @@
 // 숫자는 시험용으로 지어낸 값 (회사 데이터 아님)
 import { describe, expect, it } from 'vitest';
 import { capJudge, cautionText, lowTaText, rotScale } from './judge';
-import { capResult, CALC_REV } from './capcalc';
-import { capNormalDir } from './sign';
+import { capGeom, capResult, CALC_REV, recalcCapRecord } from './capcalc';
+import { capNormalDir, signedB } from './sign';
+import { buildReport } from './report';
 import { CSV_HEADER, recordsToCsv } from './csv';
 import type { MeasureRecord } from '../db/store';
 import { DEFAULTS } from '../settings';
@@ -95,5 +96,54 @@ describe('T.A 17°대 블록에 정상 설치된 캡 8개 (현장 상황을 본�
     expect(at('경고(주의 사유)')).toContain('T.A 24° 미만');
     expect(at('허용오차')).toBe('3.0');
     expect(at('계산방식')).toBe('1.7.0');
+  });
+});
+
+describe('θ 미입력 캡 — 먼저 재고 사무실에서 θ 를 넣어 다시 계산', () => {
+  // 지어낸 값 : 현물 T.A 46.66 · F.A 13.42 선수로 누움, 도면 δ 3° 선미, 턴오버 후, 실제 외판 73°
+  const cap = { id: 'c', blockId: 'b', no: 'P1', delta: 3, dir: -1, createdAt: 0 } as import('../db/store').Cap;
+  const block = { id: 'b', ship: 'S', block: 'B', ta: null, fa: null, capUp: true, memo: '', createdAt: 0, updatedAt: 0 } as import('../db/store').Block;
+  const mB = signedB(6.46, -1, 1);
+
+  it('θ 가 없으면 잰 값만 저장하고 판정은 θ 미입력', () => {
+    const g = capGeom(cap, block);
+    expect(g.shellMissing).toBe(true);
+    const r = capResult({ ta: 46.66, fa: 13.42, faDir: 1, delta: 3, capDir: -1, g }, 48.1, mB, DEFAULTS);
+    expect(r.pending).toBe(true);
+    expect(r.fields).toMatchObject({ verdict: 'θ 미입력', measA: 48.1, measB: mB, calcRev: CALC_REV });
+    expect(r.fields.normalA).toBeUndefined();
+    expect(r.fields.rotErr).toBeUndefined();
+  });
+
+  it('나중에 θ 를 넣으면 같은 잰 값으로 판정이 나온다', () => {
+    const g = capGeom(cap, block);
+    const saved = { id: 'r', createdAt: 0, blockId: 'b', ship: 'S', block: 'B', basis: 'ref', mode: 'cap', capId: 'c', capNo: 'P1', memo: '', highB: -1,
+      ...capResult({ ta: 46.66, fa: 13.42, faDir: 1, delta: 3, capDir: -1, g }, 48.1, mB, DEFAULTS).fields } as MeasureRecord;
+    // θ 를 아직 안 넣었으면 그대로
+    expect(recalcCapRecord(saved, cap, block, DEFAULTS)!.changed).toBe(false);
+    // θ 73° 입력
+    const re = recalcCapRecord(saved, { ...cap, shell: 73 }, block, DEFAULTS)!;
+    expect(re.changed).toBe(true);
+    expect(re.next).toMatchObject({ measA: 48.1, measB: mB, shell: 73, verdict: 'OK' });
+    expect(re.next.rotErr!).toBeCloseTo(-0.28, 2);
+    // 누운 외판은 0 을 넣는다 (보정 없이 판정)
+    const flat = recalcCapRecord(saved, { ...cap, shell: 0 }, block, DEFAULTS)!;
+    expect(flat.next.verdict).not.toBe('θ 미입력');
+    expect(flat.next.shell).toBe(0);
+  });
+
+  it('CSV · 보고서에서 θ 미입력은 판정 칸이 비고 사유가 남는다', () => {
+    const g = capGeom(cap, block);
+    const rec = { id: 'r', createdAt: 0, blockId: 'b', ship: 'S', block: 'B', basis: 'ref', mode: 'cap', capId: 'c', capNo: 'P1', memo: '', highB: -1,
+      ...capResult({ ta: 46.66, fa: 13.42, faDir: 1, delta: 3, capDir: -1, g }, 48.1, mB, DEFAULTS).fields } as MeasureRecord;
+    const row = recordsToCsv([rec]).trim().split(/\r?\n/)[1].split(',');
+    const at = (h: string) => row[CSV_HEADER.indexOf(h)];
+    expect(at('판정')).toBe('θ 미입력');
+    expect(at('정상값A')).toBe('');
+    expect(at('경고(주의 사유)')).toContain('θ 미입력');
+    const rep = buildReport({ ...block, refTa: 46.66, refFa: 13.42, refFaDir: 1 }, [cap], [rec], DEFAULTS);
+    expect(rep.rows[0]).toMatchObject({ verdict: 'θ 미입력', rotText: 'θ 미입력', dirWarn: false });
+    expect(rep.noShellCaps).toEqual(['P1']);
+    expect(rep.undecided).toBe(1);
   });
 });

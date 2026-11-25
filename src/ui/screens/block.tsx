@@ -55,6 +55,7 @@ export function BlockScreen(p: { id: string }) {
     );
 
   const latest = latestPerCap(records);
+  const waiting = caps.filter((c) => latest.get(c.id)?.verdict === 'θ 미입력').length;
   const eff = effectiveAngles(block);
   const design = hasDesign(block);
   const ref = hasRef(block);
@@ -136,6 +137,13 @@ export function BlockScreen(p: { id: string }) {
       <div class="section-title">
         <span>지주캡 {caps.length}개</span>
       </div>
+      {waiting > 0 && (
+        <div class="section">
+          <div class="note c-warn" style={{ marginTop: 0 }}>
+            θ(외판 기울기)를 기다리는 기록이 있는 캡 {waiting}개 — 캡을 눌러 ··· › 지주캡 수정에서 θ 를 넣으면 잰 값 그대로 다시 계산돼요
+          </div>
+        </div>
+      )}
       {caps.length === 0 ? (
         <div class="section">
           <div class="note" style={{ marginTop: 0 }}>
@@ -155,7 +163,7 @@ export function BlockScreen(p: { id: string }) {
                     δ {Number(c.delta.toFixed(3))}° {capDirText(c.delta, c.dir)}
                     {Math.abs(c.delta) >= 1e-9 && (c.shell != null ? ` · 외판 ${Number(c.shell.toFixed(1))}°` : '')}
                     {r?.rotErr != null && !isLegacyCap(r) && ` · ${rotText(r.rotErr, c.delta, r.dir ?? c.dir)}`}
-                    {Math.abs(c.delta) >= 1e-9 && c.shell == null && <span class="c-warn"> · 외판 기울기 없음</span>}
+                    {Math.abs(c.delta) >= 1e-9 && c.shell == null && <span class="c-warn"> · θ 미입력</span>}
                   </div>
                 </div>
                 <div class="tail">

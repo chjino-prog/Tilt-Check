@@ -62,7 +62,7 @@ export interface Report {
   ok: number;
   caution: number; // 주의 (A · B 는 안, 역산 회전 이상)
   ng: number;
-  undecided: number; // 판정불가 (방향 보류)
+  undecided: number; // 판정불가 (방향 보류) · θ 미입력
   worst: ReportRow | null; // A · B 편차가 가장 큰 캡
   tol: number;
   lowTa: boolean; // T.A 24° 미만 — 역산 회전이 크게 부풀려지는 블록
@@ -94,7 +94,9 @@ export function buildReport(block: Block, caps: Cap[], records: MeasureRecord[],
     const dir = capDirOf(delta, r.dir ?? c.dir);
     const rot = r.rotErr ?? null;
     const g = { shell: r.shell, up: r.up }; // 그 기록을 계산한 조건 그대로
+    const waiting = r.verdict === 'θ 미입력'; // 외판 기울기를 아직 안 넣어 판정 전
     const dw =
+      !waiting &&
       r.measA != null && r.ta != null && r.fa != null ? dirSuspect(r.ta, r.fa, faDir, delta, r.dir ?? c.dir, r.measA, g) != null : false;
     const j = r.errA != null && r.errB != null ? capJudge(r.errA, r.errB, rot, r.ta, s.capTol) : null;
     return {
@@ -111,8 +113,8 @@ export function buildReport(block: Block, caps: Cap[], records: MeasureRecord[],
       errB: r.errB,
       rotErr: rot,
       rotBow: rot == null ? null : rotToBow(rot, delta, dir),
-      rotText: rot == null ? '역산 불가' : rotText(rot, delta, dir),
-      verdict: dw || !j ? '판정불가' : j.verdict,
+      rotText: waiting ? 'θ 미입력' : rot == null ? '역산 불가' : rotText(rot, delta, dir),
+      verdict: waiting ? 'θ 미입력' : dw || !j ? '판정불가' : j.verdict,
       caution: !dw && j ? cautionText(j) || undefined : undefined,
       dirWarn: dw,
       shell: r.shell,

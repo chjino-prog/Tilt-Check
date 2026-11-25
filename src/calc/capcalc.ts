@@ -27,11 +27,19 @@ export function calcRevName(rev: number | undefined): string {
   return rev >= 3 ? '1.7.0' : '1.6.0';
 }
 
-/** 캡의 계산 조건. δ 0 캡은 외판 기울기를 쓰지 않는다 */
+/**
+ * 캡의 계산 조건. δ 0 캡은 외판 기울기를 쓰지 않는다.
+ * δ 가 있는데 외판 기울기 θ 가 비어 있으면 (설계 반영 전 — 현물에서 재서 나중에 넣음) shellMissing.
+ * 누운 외판은 0 을 넣는다.
+ */
 export function capGeom(cap: Pick<Cap, 'delta' | 'shell'> | null | undefined, block: Pick<Block, 'capUp'> | null | undefined): CapGeom {
-  const shell = cap && Math.abs(cap.delta) >= 1e-9 && cap.shell != null && cap.shell > 0 ? cap.shell : null;
-  return { shell, up: !!block?.capUp };
+  const hasDelta = !!cap && Math.abs(cap.delta) >= 1e-9;
+  const shell = hasDelta && cap!.shell != null ? cap!.shell : null; // 0 = 누운 외판 (보정 없음)
+  return { shell, up: !!block?.capUp, shellMissing: hasDelta && cap!.shell == null };
 }
+
+/** θ 미입력 기록의 사유 글 */
+export const SHELL_WAIT = '외판 기울기 θ 미입력 — 입력하면 판정';
 
 export interface CapCalcIn {
   ta: number; // 계산에 쓰는 T.A (실제 경사)
@@ -46,6 +54,7 @@ export interface CapResult {
   analysis: CapAnalysisDir;
   suspect: boolean; // A 가 반대 방향 정상값에 더 맞음 → 판정 보류
   judge: CapJudge; // A · B 판정 (보류여도 계산은 해 둔다)
+  pending: boolean; // 외판 기울기 θ 미입력 — 잰 값만 저장, 판정은 θ 입력 후
   fields: Partial<MeasureRecord> & Pick<MeasureRecord, 'verdict'>;
 }
 
@@ -54,12 +63,28 @@ export function capResult(c: CapCalcIn, measAbsA: number, measB: number, s: Sett
   const n = capNormalDir(c.ta, c.fa, c.faDir, c.delta, c.capDir, c.g);
   const measA = signedA(measAbsA, n.thetaA);
   const a = analyzeCapDir(c.ta, c.fa, c.faDir, c.delta, c.capDir, measA, measB, c.g);
-  const suspect = dirSuspect(c.ta, c.fa, c.faDir, c.delta, c.capDir, measAbsA, c.g) != null;
   const judge = capJudge(a.errA, a.errB, a.rotErr, c.ta, s.capTol);
+  if (c.g.shellMissing) {
+    // θ 를 모르면 정상값 자체가 틀리므로 잰 값만 남긴다 (계산 칸은 비워 둔다)
+    return {
+      analysis: a,
+      suspect: false,
+      judge,
+      pending: true,
+      fields: {
+        ta: c.ta, fa: c.fa, faDir: c.faDir, delta: c.delta, dir: capDirOf(c.delta, c.capDir), shell: undefined, up: c.g.up || undefined,
+        deltaCap: undefined, deltaRealCap: undefined, normalA: undefined, normalB: undefined, measA, measB,
+        errA: undefined, errB: undefined, deltaReal: undefined, rotErr: undefined, aResid: undefined,
+        verdict: 'θ 미입력', tol: judge.tol, rotScale: judge.scale, caution: SHELL_WAIT, calcRev: CALC_REV,
+      },
+    };
+  }
+  const suspect = dirSuspect(c.ta, c.fa, c.faDir, c.delta, c.capDir, measAbsA, c.g) != null;
   return {
     analysis: a,
     suspect,
     judge,
+    pending: false,
     fields: {
       ta: c.ta,
       fa: c.fa,
@@ -101,7 +126,7 @@ export function recalcCapRecord(r: MeasureRecord, cap: Cap | null | undefined, b
   const design = r.basis !== 'ref';
   const ta = design && !r.calcRev ? designSlope(r.ta, r.fa) : r.ta;
   const taDesign = design ? (r.calcRev ? r.taDesign : Math.abs(r.ta)) : undefined;
-  const g = capGeom({ delta: r.delta, shell: cap?.shell }, block);
+  const g = capGeom({ delta: r.delta, shell: cap ? cap.shell : r.shell }, block); // 캡을 지웠으면 기록의 외판 값
   const res = capResult({ ta, fa: r.fa, faDir: r.faDir ?? 1, delta: r.delta, capDir: r.dir ?? 1, g }, Math.abs(r.measA), r.measB, s);
   const next: MeasureRecord = { ...r, ...res.fields, taDesign, recalcAt: Date.now() };
   // 결과가 실제로 바뀔 때만 다시 계산을 권한다 (예전 방식이어도 값이 같으면 그대로 둔다)

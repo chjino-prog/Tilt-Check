@@ -43,6 +43,8 @@ export interface CapGeom {
   shell?: number | null;
   /** 턴오버 후 — 캡이 하늘을 보는 자세에서 잼 */
   up?: boolean;
+  /** δ 가 있는데 외판 기울기 θ 를 아직 안 넣음 (설계 반영 전) — 잰 값만 남기고 판정은 θ 입력 후 */
+  shellMissing?: boolean;
 }
 
 /** 계산식에 넣는 회전 부호 s (턴오버 후면 뒤집는다) */

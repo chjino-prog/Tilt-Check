@@ -14,7 +14,7 @@ import { back, go } from '../router';
 import { ConfirmSheet, Cta, Headline, MenuRow, NumInput, RefNote, RefWarningSheet, Seg, Sheet, TopBar, toast } from '../components/ui';
 import { HeadCard, HighPicker, ReadingCard, useHead, useHighSide, useMeasure } from '../components/reading';
 import { Gauge, PlanFigure } from '../components/gauge';
-import { IBack, ICamera, ICheck, IChevron, IEdit, IImage, IInfo, IMore, IRuler, ITrash, IWarn, IX } from '../icons';
+import { IBack, ICamera, ICheck, IChevron, IEdit, IImage, IInfo, IMinus, IMore, IRuler, ITrash, IWarn, IX } from '../icons';
 import { CapFaceSeg, CapSheet } from './edit-sheets';
 import { makePhoto } from './photo';
 
@@ -208,7 +208,7 @@ export function CapScreen(p: { blockId: string; capId: string }) {
   const g = capGeom(cap, block);
   const normal = capNormalDir(eff.ta, eff.fa, eff.faDir, cap.delta, cap.dir, g);
   const dirText = capDirText(cap.delta, cap.dir);
-  const noShell = Math.abs(cap.delta) >= 1e-9 && g.shell == null;
+  const noShell = !!g.shellMissing; // δ 가 있는데 θ 미입력 — 재는 건 되고, 판정은 θ 입력 후
   const aWeak = normal.dA < s.aSensMin;
   const lines = capLines(cap.no);
   const title = `캡 ${cap.no}`;
@@ -280,6 +280,7 @@ export function CapScreen(p: { blockId: string; capId: string }) {
         open={editing}
         blockId={block.id}
         cap={cap}
+        focusShell={noShell}
         onClose={() => setEditing(false)}
         onSaved={(c) => {
           setEditing(false);
@@ -344,11 +345,11 @@ export function CapScreen(p: { blockId: string; capId: string }) {
           <div class="banner">
             <IWarn />
             <div>
-              <b>캡 자리 외판 기울기가 없어요</b>
-              <span class="muted">도면 δ 는 외판 위 각도라, 외판이 서 있으면 회전오차가 크게 틀려요. 지금은 외판이 누운 것으로 계산해요</span>
+              <b>외판 기울기 θ 가 아직 없어요 — 그대로 재도 돼요</b>
+              <span class="muted">잰 값은 저장되고, 나중에 θ 를 넣으면 판정이 나와요. 아래 정상값은 외판이 누웠다고 본 참고값이에요</span>
               <div>
                 <button class="text-btn mt8" onClick={() => setEditing(true)}>
-                  외판 기울기 넣기
+                  θ 지금 넣기
                 </button>
               </div>
             </div>
@@ -625,8 +626,8 @@ function ResultScreen(p: {
   const measB = p.rB.high ? signedB(p.rB.v, p.rB.high, eff.faDir) : 0;
   // 계산은 capcalc 한 곳에서 — 실제 δ · 회전오차는 도면과 같은 외판 위 각도
   const res = useMemo(
-    () => capResult({ ta: eff.ta, fa: eff.fa, faDir: eff.faDir, delta: cap.delta, capDir, g: { shell: g.shell, up: g.up } }, p.rA.v, measB, s),
-    [eff.ta, eff.fa, eff.faDir, cap.delta, capDir, g.shell, g.up, p.rA.v, measB, s],
+    () => capResult({ ta: eff.ta, fa: eff.fa, faDir: eff.faDir, delta: cap.delta, capDir, g: { shell: g.shell, up: g.up, shellMissing: g.shellMissing } }, p.rA.v, measB, s),
+    [eff.ta, eff.fa, eff.faDir, cap.delta, capDir, g.shell, g.up, g.shellMissing, p.rA.v, measB, s],
   );
   const r = res.analysis;
   const measA = res.fields.measA!;
@@ -635,7 +636,7 @@ function ResultScreen(p: {
     [eff.ta, eff.fa, eff.faDir, cap.delta, capDir, measA, measB, g.shell, g.up],
   );
   // ① 캡 · F.A 방향 · 턴오버 점검 (A 로) — 의심되면 판정을 보류한다
-  const dirS = dirSuspect(eff.ta, eff.fa, eff.faDir, cap.delta, capDir, p.rA.v, g);
+  const dirS = res.pending ? null : dirSuspect(eff.ta, eff.fa, eff.faDir, cap.delta, capDir, p.rA.v, g);
   // ② 높은 쪽 : 판정을 가르는 캡이면 두 결과를 나란히, 아니면 반대가 훨씬 그럴듯할 때만 (B 편차 기준)
   const sensitive = highSensitive(eff.ta, eff.fa, eff.faDir, cap.delta, capDir, s.capTol, g);
   const suspect = p.rB.high && !sensitive ? flipSuspect(r, flipped, s.capTol) : null;
@@ -691,6 +692,71 @@ function ResultScreen(p: {
     toast('기록을 저장했어요');
     back('/block/' + block.id);
   };
+
+  if (res.pending) {
+    // θ 미입력 : 잰 값만 저장 — 사무실에서 θ 를 넣으면 그 기록이 다시 계산된다
+    return (
+      <div class="screen">
+        {p.bar}
+        <div class="result-hero">
+          <div class="mark none">
+            <IMinus />
+          </div>
+          <h1>θ 를 넣으면 판정해요</h1>
+          <p>외판 기울기 θ 가 없어 정상값을 아직 못 정해요. 잰 값은 그대로 저장돼요</p>
+          <button class="text-btn mt8" onClick={p.onEditCap}>
+            θ 지금 넣기
+          </button>
+        </div>
+        <div class="section">
+          <div class="ab-grid">
+            <div class="ab-cell">
+              <div class="ab-head">
+                <b>각도 B</b>
+                <span>WEB 직각 · 현물{p.rB.manual ? ' · 수평계' : ''}</span>
+              </div>
+              <div class="ab-dev num">
+                {fmt(p.rB.v, d)}
+                <small>°</small>
+              </div>
+              <div class="ab-note">{p.rB.high ? `${dirName(p.rB.high)} 높음` : '수평'}</div>
+            </div>
+            <div class="ab-cell">
+              <div class="ab-head">
+                <b>각도 A</b>
+                <span>WEB 방향 · 현물{p.rA.manual ? ' · 수평계' : ''}</span>
+              </div>
+              <div class="ab-dev num">
+                {fmt(p.rA.v, d)}
+                <small>°</small>
+              </div>
+              <div class="ab-note">숫자만</div>
+            </div>
+          </div>
+        </div>
+        <div class="section">
+          <div class="note num" style={{ marginTop: 0 }}>
+            나중에 블록 › 캡 {cap.no} › 지주캡 수정에서 θ 를 넣으면 이 기록이 저절로 다시 계산돼요 (δ {fmt(cap.delta, 2)}° {dirName(capDir)})
+          </div>
+        </div>
+        <div class="section">
+          <div class="field">
+            <label>메모 (선택)</label>
+            <input class="input" type="text" value={memo} placeholder="특이사항" onInput={(e) => setMemo((e.target as HTMLInputElement).value)} />
+          </div>
+        </div>
+        <Cta>
+          <button class="btn grey" onClick={p.onRetry}>
+            다시 재기
+          </button>
+          <button class="btn" disabled={saving} onClick={save}>
+            기록 저장
+          </button>
+        </Cta>
+        {p.children}
+      </div>
+    );
+  }
 
   if (dirS) {
     const faUnset = !eff.faDirSet;

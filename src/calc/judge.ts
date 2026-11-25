@@ -70,7 +70,7 @@ export function verdictLevel(v: Verdict): Level {
   if (v === 'OK' || v === '양호') return 'good';
   if (v === '주의') return 'warn';
   if (v === 'NG' || v === '초과') return 'bad';
-  return 'none';
+  return 'none'; // 기준미정 · 판정불가 · θ 미입력
 }
 
 /** 캡 회전 방향 글 — δ 가 0 이면 돌아간 게 없으니 빈 글 */

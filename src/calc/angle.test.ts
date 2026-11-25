@@ -340,8 +340,10 @@ describe('외판 기울기 보정 (도면 δ = 외판 면 위 각도)', () => {
   });
 
   it('δ 0 캡 · 외판 기울기 없음은 예전 계산과 같다', () => {
-    expect(capGeom({ delta: 0, shell: 70 }, { capUp: true })).toEqual({ shell: null, up: true });
-    expect(capGeom({ delta: 3, shell: 70 }, null)).toEqual({ shell: 70, up: false });
+    expect(capGeom({ delta: 0, shell: 70 }, { capUp: true })).toEqual({ shell: null, up: true, shellMissing: false });
+    expect(capGeom({ delta: 3, shell: 70 }, null)).toEqual({ shell: 70, up: false, shellMissing: false });
+    expect(capGeom({ delta: 3, shell: 0 }, null)).toEqual({ shell: 0, up: false, shellMissing: false }); // 0 = 누운 외판
+    expect(capGeom({ delta: 3 }, null)).toEqual({ shell: null, up: false, shellMissing: true }); // θ 미입력
     const a = analyzeCapDir(34.41, 3.23, -1, 7, -1, 34.6, 0.5);
     const b = analyzeCapDir(34.41, 3.23, -1, 7, -1, 34.6, 0.5, { shell: null, up: false });
     expect(b.rotErr).toBe(a.rotErr);

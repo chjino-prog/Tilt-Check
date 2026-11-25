@@ -10,6 +10,7 @@ import { go } from '../router';
 import { BrandBar, ConfirmSheet, Cta, Empty, Headline, MenuRow, Seg, Sheet, TopBar, toast } from '../components/ui';
 import { IChevron, IDownload, IInfo, IShare, ITabRecord, IWarn } from '../icons';
 import { SameSignBanner } from './block';
+import { CapSheet } from './edit-sheets';
 
 const today = () => new Date().toISOString().slice(0, 10).replace(/-/g, '');
 
@@ -128,6 +129,7 @@ type Filter = 'all' | 'cap' | 'line';
 function summary(r: MeasureRecord, d: number): string {
   if (r.mode === 'cap') {
     if (isLegacyCap(r)) return `1.2.0 전 계산 방식 · 회전오차 ${fmtSigned(r.rotErr, 2)}°`;
+    if (r.verdict === 'θ 미입력') return `B ${bText(r.measB, r.faDir ?? 1)} · A ${fmt(Math.abs(r.measA ?? NaN), 2)}° · θ 입력 대기`;
     // 1.7.0 : 판정 기준인 A · B 편차를 앞에, 역산 회전은 뒤에 참고로
     const rot = r.rotErr == null ? '역산 불가' : `회전 ${fmtSigned(r.rotErr, 2)}°`;
     return `B ${fmtSigned(r.errB, 2)}° · A ${fmtSigned(r.errA, 2)}° · ${rot}`;
@@ -262,6 +264,7 @@ function RecordSheet(p: { record: MeasureRecord | null; onClose: () => void; onD
   const [url, setUrl] = useState<string | null>(null);
   const [ctx, setCtx] = useState<{ cap?: Cap; block?: Block } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [capEdit, setCapEdit] = useState(false);
   useEffect(() => {
     if (!r?.photo) return setUrl(null);
     const u = URL.createObjectURL(r.photo);
@@ -278,7 +281,8 @@ function RecordSheet(p: { record: MeasureRecord | null; onClose: () => void; onD
   }, [r?.id, r?.recalcAt]);
   if (!r) return null;
   const re = ctx ? recalcCapRecord(r, ctx.cap, ctx.block, s) : null;
-  const offer = re && re.changed && !re.suspect ? re.next : null;
+  const waiting = r.verdict === 'θ 미입력';
+  const offer = re && re.changed && !re.suspect && !waiting ? re.next : null;
   const kv = (k: string, v: string) => (
     <div class="kv">
       <span class="k">{k}</span>
@@ -287,6 +291,7 @@ function RecordSheet(p: { record: MeasureRecord | null; onClose: () => void; onD
   );
   const f = (n: number | null | undefined) => (n == null ? '—' : fmtSigned(n, 2) + '°');
   return (
+    <>
     <Sheet open={!!r} onClose={p.onClose}>
       <h2>{r.mode === 'cap' ? `캡 ${r.capNo}` : r.lineLabel}</h2>
       <p class="sub num">
@@ -298,6 +303,20 @@ function RecordSheet(p: { record: MeasureRecord | null; onClose: () => void; onD
           <div>
             <b>1.2.0 전 계산 방식의 기록이에요</b>
             <span class="muted">F.A 방향 · B 높은 쪽 없이 계산돼, F.A 선미 블록이면 회전오차가 크게 틀릴 수 있어요. 같은 방향 경고 계산에서는 빼요</span>
+          </div>
+        </div>
+      )}
+      {waiting && (
+        <div class="banner info">
+          <IInfo />
+          <div>
+            <b>외판 기울기 θ 를 넣으면 판정해요</b>
+            <span class="muted">잰 값(A · B · 높은 쪽)은 저장돼 있어요. θ 를 넣으면 이 캡의 기록이 모두 다시 계산돼요</span>
+            <div>
+              <button class="btn small dark mt8" disabled={!ctx?.cap} onClick={() => setCapEdit(true)}>
+                {ctx?.cap ? `캡 ${ctx.cap.no} θ 넣기` : '캡이 지워져 넣을 수 없어요'}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -346,7 +365,7 @@ function RecordSheet(p: { record: MeasureRecord | null; onClose: () => void; onD
       )}
       {r.mode === 'cap' ? (
         <>
-          {r.caution && (
+          {r.caution && !waiting && (
             <div class="banner">
               <IWarn />
               <div>
@@ -364,7 +383,7 @@ function RecordSheet(p: { record: MeasureRecord | null; onClose: () => void; onD
             {r.tol != null && kv('합격 허용오차', `±${fmt(r.tol, 1)}° (그때 설정)`)}
           </div>
           <div class="kv-group">
-            {kv('역산 회전 (참고)', isLegacyCap(r) ? f(r.rotErr) : r.rotErr == null ? '역산 불가' : `${f(r.rotErr)} · ${rotText(r.rotErr, r.delta ?? 0, r.dir ?? 1)}`)}
+            {kv('역산 회전 (참고)', isLegacyCap(r) ? f(r.rotErr) : r.rotErr == null ? (waiting ? '—' : '역산 불가') : `${f(r.rotErr)} · ${rotText(r.rotErr, r.delta ?? 0, r.dir ?? 1)}`)}
             {kv('실제 δ (참고)', r.deltaReal == null ? '—' : fmt(r.deltaReal, 2) + '°' + (r.shell != null && r.deltaRealCap != null ? ` (상판 ${fmt(r.deltaRealCap, 2)}°)` : ''))}
             {kv('A 잔차 (참고)', f(r.aResid))}
             {r.rotScale != null && kv('회전 환산 배율', `B 1° → 회전 ${fmt(r.rotScale, 1)}°`)}
@@ -412,5 +431,21 @@ function RecordSheet(p: { record: MeasureRecord | null; onClose: () => void; onD
         </button>
       </div>
     </Sheet>
+    {ctx?.cap && (
+      <CapSheet
+        open={capEdit}
+        blockId={ctx.cap.blockId}
+        cap={ctx.cap}
+        focusShell
+        onClose={() => setCapEdit(false)}
+        onSaved={(c, recalced) => {
+          setCapEdit(false);
+          setCtx({ ...ctx, cap: c });
+          const mine = recalced.find((x) => x.id === r.id);
+          if (mine) p.onRecalc(mine);
+        }}
+      />
+    )}
+    </>
   );
 }

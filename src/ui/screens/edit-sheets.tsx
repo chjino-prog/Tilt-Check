@@ -2,7 +2,8 @@
 import { useEffect, useState } from 'preact/hooks';
 import { blockAnglesLookRight, type Dir } from '../../calc/angle';
 import { fmt, parseNum } from '../../calc/judge';
-import { newId, saveBlock, saveCap, type Block, type Cap } from '../../db/store';
+import { newId, saveBlock, saveCap, type Block, type Cap, type MeasureRecord } from '../../db/store';
+import { recalcCapRecords } from '../../db/recalc';
 import { ShellHelpSheet } from '../components/shell';
 import { Field, NumInput, Seg, Sheet, TextInput, toast } from '../components/ui';
 
@@ -125,7 +126,15 @@ export function BlockSheet(p: { open: boolean; block?: Block | null; onClose: ()
   );
 }
 
-export function CapSheet(p: { open: boolean; blockId: string; cap?: Cap | null; onClose: () => void; onSaved: (c: Cap) => void }) {
+export function CapSheet(p: {
+  open: boolean;
+  blockId: string;
+  cap?: Cap | null;
+  /** θ 칸에 먼저 커서 (나중에 θ 넣기) */
+  focusShell?: boolean;
+  onClose: () => void;
+  onSaved: (c: Cap, recalced: MeasureRecord[]) => void;
+}) {
   const [no, setNo] = useState('');
   const [delta, setDelta] = useState('');
   const [dir, setDir] = useState<Dir>(1);
@@ -159,8 +168,12 @@ export function CapSheet(p: { open: boolean; blockId: string; cap?: Cap | null; 
       createdAt: p.cap?.createdAt ?? Date.now(),
     };
     await saveCap(c);
-    toast(p.cap ? '지주캡을 고쳤어요' : '지주캡을 추가했어요');
-    p.onSaved(c);
+    // δ · 방향 · θ 가 바뀌면 그 캡의 지난 기록을 잰 값 그대로 다시 계산 (θ 를 나중에 넣는 경우)
+    const old = p.cap;
+    const geomChanged = !!old && (old.delta !== c.delta || old.dir !== c.dir || (old.shell ?? null) !== (c.shell ?? null));
+    const recalced = geomChanged ? await recalcCapRecords(c) : [];
+    toast(recalced.length ? `지난 기록 ${recalced.length}건을 다시 계산했어요` : p.cap ? '지주캡을 고쳤어요' : '지주캡을 추가했어요');
+    p.onSaved(c, recalced);
   };
 
   return (
@@ -186,8 +199,8 @@ export function CapSheet(p: { open: boolean; blockId: string; cap?: Cap | null; 
                 ]}
               />
             </Field>
-            <Field label="캡 자리 외판 기울기" hint="FR 단면에서 외판 접선과 A/B 수평선 사이 각. 모르면 비워 두세요 — 서 있는 외판이면 회전오차가 크게 틀려요">
-              <NumInput value={shell} onInput={(v) => setShell(v.replace(/[-−]/g, ''))} placeholder="예: 60" unit="°" />
+            <Field label="캡 자리 외판 기울기 θ" hint="FR 단면에서 외판 접선과 A/B 수평선 사이 각 (누운 외판 0). 모르면 비워 두고 먼저 재도 돼요 — 나중에 넣으면 잰 기록이 다시 계산돼요">
+              <NumInput value={shell} onInput={(v) => setShell(v.replace(/[-−]/g, ''))} placeholder="비우면 나중에" unit="°" autoFocus={p.focusShell} />
             </Field>
             <button class="text-btn" style={{ marginTop: '-4px', marginBottom: '8px' }} onClick={() => setHelp(true)}>
               어디를 재나요?

@@ -357,7 +357,7 @@ function Checks(p: { rep: Report }) {
     lines.push({ kind: 'warn', text: `모든 캡이 ${r.sameSign.sign > 0 ? '선수' : '선미'} 쪽으로 돌았어요 — 블록 세팅 · 마킹 기준 확인 필요` });
   }
   if (r.noShellCaps.length) {
-    lines.push({ kind: 'warn', text: `${r.noShellCaps.join(', ')} : 캡 자리 외판 기울기 없이 계산 — 서 있는 외판이면 회전오차가 크게 틀릴 수 있어요` });
+    lines.push({ kind: 'warn', text: `${r.noShellCaps.join(', ')} : 외판 기울기 θ 미입력 — θ 를 넣으면 잰 값 그대로 판정해요` });
   }
   if (r.caution > 0) {
     lines.push({
@@ -421,7 +421,7 @@ function ResRow(p: { row: ReportRow; compact?: boolean }) {
   }
   const v = x.verdict;
   const cls = v === 'OK' ? 'ok' : v === 'NG' ? 'ng' : v === '주의' ? 'warn' : 'none';
-  const vText = v === 'OK' || v === 'NG' || v === '주의' ? v : '보류';
+  const vText = v === 'OK' || v === 'NG' || v === '주의' ? v : v === 'θ 미입력' ? 'θ대기' : '보류';
   // '선수 쪽으로 0.74° 덜 돌아감' → '선수 쪽으로 덜 돌아감' (좁으면 '선수 쪽 덜')
   let rest = x.rotText?.replace(/ [\d.]+°/, '') ?? '';
   if (c) rest = rest.replace('으로', '').replace(' 돌아감', '');
@@ -432,13 +432,13 @@ function ResRow(p: { row: ReportRow; compact?: boolean }) {
       <td>{dTxt}</td>
       <td>
         {c ? (
-          <span class="val">{f2(x.errB)}°</span>
+          <span class="val">{x.errB != null ? `${f2(x.errB)}°` : '—'}</span>
         ) : (
           <>
             <span class="val">
               {f2(x.normalB)} → {f2(x.measB)}°
             </span>{' '}
-            <span class="rpt-sub s">{high}</span> <b class="dev">{f2(x.errB)}°</b>
+            <span class="rpt-sub s">{high}</span> {x.errB != null && <b class="dev">{f2(x.errB)}°</b>}
           </>
         )}
       </td>
@@ -447,7 +447,7 @@ function ResRow(p: { row: ReportRow; compact?: boolean }) {
           <span class="val">
             {f2(x.normalA)} → {f2(x.measA)}°
           </span>{' '}
-          <b class="dev">{fmtSigned(x.errA, 2)}°</b>
+          {x.errA != null && <b class="dev">{fmtSigned(x.errA, 2)}°</b>}
         </td>
       )}
       <td class="l nowrap">

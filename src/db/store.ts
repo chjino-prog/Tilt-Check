@@ -30,7 +30,7 @@ export interface Cap {
   createdAt: number;
 }
 
-export type Verdict = 'OK' | 'NG' | '기준미정' | '판정불가' | '양호' | '주의' | '초과';
+export type Verdict = 'OK' | 'NG' | '기준미정' | '판정불가' | '양호' | '주의' | '초과' | 'θ 미입력';
 
 export interface MeasureRecord {
   id: string;
@@ -51,7 +51,7 @@ export interface MeasureRecord {
   capNo?: string;
   delta?: number; // 도면 δ (외판 면 위)
   dir?: Dir;
-  shell?: number; // 계산에 쓴 캡 자리 외판 기울기
+  shell?: number; // 계산에 쓴 캡 자리 외판 기울기 (0 = 누운 외판, 없고 δ 가 있으면 'θ 미입력' 기록)
   up?: boolean; // 턴오버 후 (캡이 하늘을 보는 자세)에서 잼
   deltaCap?: number; // 계산에 쓴 캡 상판 δ
   deltaRealCap?: number | null; // B 로 역산한 실제 상판 δ

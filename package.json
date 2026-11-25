@@ -1,6 +1,6 @@
 {
   "name": "tilt-check",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "private": true,
   "description": "TILT CHECK — 지주캡 · 부재 각도 측정 PWA",
   "type": "module",
