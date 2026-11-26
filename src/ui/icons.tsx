@@ -49,7 +49,9 @@ export const ITabMeasure = () => (
     <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
   </svg>
 );
-export const ITabRecord = () => <S d={['M6 3h9l4 4v14H6z', 'M9 11h7', 'M9 15h7', 'M9 7h3']} />;
+/** 탭 : 설명서 (펼친 책) */
+export const ITabGuide = () => <S d={['M12 6.5C10 5 7 4.5 3.5 4.5v14c3.5 0 6.5.5 8.5 2 2-1.5 5-2 8.5-2v-14C17 4.5 14 5 12 6.5z', 'M12 6.5v14']} />;
+export const ITabRecord =() => <S d={['M6 3h9l4 4v14H6z', 'M9 11h7', 'M9 15h7', 'M9 7h3']} />;
 export const ITabSetting = () => (
   <S
     d={[

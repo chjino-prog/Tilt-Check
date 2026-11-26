@@ -2003,3 +2003,379 @@ textarea.input {
 .why-tbl tr.now td {
   background: var(--bg-sub);
 }
+
+/* ── 설명서 탭 (gd-) */
+.gd-card {
+  margin: 0 20px 20px;
+  padding: 14px 12px 12px;
+  border-radius: 20px;
+  background: var(--bg-sub);
+}
+:root[data-theme='dark'] .gd-card {
+  background: var(--card);
+}
+.gd-card-h {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+  margin: 0 4px 8px;
+}
+.gd-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.gd-tile {
+  text-align: left;
+  border-radius: 12px;
+  padding: 6px 6px 8px;
+  background: var(--bg);
+}
+:root[data-theme='dark'] .gd-tile {
+  background: var(--elev);
+}
+.gd-tile:active {
+  transform: scale(0.98);
+}
+.gd-tile b {
+  display: block;
+  font-size: 13px;
+  margin-top: 6px;
+}
+.gd-tile span {
+  display: block;
+  font-size: 12px;
+  color: var(--text-3);
+}
+.c-a {
+  color: var(--blue-weak-text);
+}
+.c-b {
+  color: var(--orange);
+}
+.row .lead.orange {
+  background: var(--orange-weak);
+  color: var(--orange);
+}
+.row .lead.sym {
+  font-size: 18px;
+}
+.row .lead.abbr {
+  font-size: 12px;
+}
+/* 측정 방향 그림(cap-guide.webp 1400×908)에서 TS 두 칸 잘라 쓰기 — report.css 와 같은 자리 */
+.gd-crop {
+  border-radius: 8px;
+  background-color: #fff;
+  background-repeat: no-repeat;
+  aspect-ratio: 684 / 328;
+}
+.gd-crop.ts-ta {
+  background-size: 204.68% auto;
+  background-position: 1.12% 17.59%;
+}
+.gd-crop.ts-fa {
+  background-size: 205.28% auto;
+  background-position: 99.16% 17.59%;
+}
+.gd-links {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 0 20px;
+}
+.gd-link {
+  text-align: left;
+  border-radius: 16px;
+  padding: 14px 16px;
+  background: var(--bg-sub);
+}
+:root[data-theme='dark'] .gd-link {
+  background: var(--card);
+}
+.gd-link.warn {
+  background: var(--orange-weak);
+}
+.gd-link:active {
+  transform: scale(0.98);
+}
+.gd-link span {
+  display: block;
+  font-size: 13px;
+  color: var(--text-3);
+}
+.gd-link.warn span {
+  color: var(--orange);
+}
+.gd-link b {
+  display: block;
+  font-size: 16px;
+  margin-top: 2px;
+}
+/* 용어 시트 */
+.gd-eyebrow {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-3);
+  margin-bottom: 4px;
+}
+.sheet .gd-sub {
+  margin-bottom: 14px;
+}
+.gd-fig {
+  position: relative;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  padding: 8px;
+  background: var(--bg);
+}
+:root[data-theme='dark'] .gd-fig {
+  background: var(--card);
+}
+.gd-fig .tag {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+}
+.gd-fig .tag.a {
+  background: var(--blue);
+}
+.gd-fig .tag.b {
+  background: var(--orange);
+}
+.gd-fig-note {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-3);
+  margin-top: 6px;
+}
+.gd-fig-note a {
+  color: var(--blue);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.gd-kv {
+  display: flex;
+  gap: 14px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line);
+  word-break: keep-all;
+}
+.gd-kv:last-of-type {
+  border-bottom: 0;
+}
+.gd-kv .k {
+  width: 64px;
+  flex: none;
+  font-size: 14px;
+  color: var(--text-3);
+  padding-top: 1px;
+}
+.gd-kv .v {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 500;
+}
+.gd-kv .v small {
+  display: block;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-3);
+  margin-top: 2px;
+}
+.gd-warn {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--orange-weak);
+  font-size: 14px;
+  line-height: 1.5;
+  word-break: keep-all;
+  margin-top: 6px;
+}
+.gd-warn svg {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  color: var(--orange);
+  margin-top: 1px;
+}
+.gd-rel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0 18px;
+  font-size: 13px;
+  color: var(--text-3);
+}
+.gd-chip {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 16px;
+  background: var(--grey-btn);
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 600;
+}
+.gd-chip:active {
+  background: var(--grey-btn-press);
+}
+/* 도면 모양 그림 (δ · θ · T.A · F.A) — 다크 테마에서도 보이게 색은 토큰으로 */
+.dwg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.dwg text {
+  fill: var(--text);
+  font-family: inherit;
+}
+.dwg .ln {
+  fill: none;
+  stroke: var(--text);
+}
+.dwg .faint {
+  fill: none;
+  stroke: var(--text-3);
+}
+.dwg .hl {
+  fill: none;
+  stroke: var(--orange);
+}
+.dwg .hl-b {
+  fill: none;
+  stroke: var(--blue);
+}
+.dwg .fill-hl {
+  fill: var(--orange);
+}
+.dwg .fill-b {
+  fill: var(--blue);
+}
+.dwg .fill-ink {
+  fill: var(--text);
+}
+.dwg .bubble {
+  fill: var(--orange-weak);
+  stroke: var(--orange);
+}
+.dwg .bubble-b {
+  fill: var(--blue-weak);
+  stroke: var(--blue);
+}
+.dwg text.t-hl {
+  fill: var(--orange);
+  font-weight: 700;
+}
+.dwg text.t-b {
+  fill: var(--blue-weak-text);
+  font-weight: 700;
+}
+.dwg text.t-dim {
+  fill: var(--text-3);
+}
+/* 재는 순서 */
+.gd-steps {
+  padding: 0 24px;
+}
+.gd-step {
+  display: flex;
+  gap: 14px;
+}
+.gd-step .rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: none;
+}
+.gd-step .n {
+  width: 28px;
+  height: 28px;
+  border-radius: 14px;
+  background: var(--blue);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+}
+.gd-step .n.b {
+  background: var(--orange);
+}
+.gd-step .bar {
+  width: 2px;
+  flex: 1;
+  background: var(--line);
+  margin: 4px 0;
+}
+.gd-step .txt {
+  padding-bottom: 18px;
+  word-break: keep-all;
+}
+.gd-step .txt b {
+  display: block;
+  font-size: 16px;
+  line-height: 28px;
+}
+.gd-step .txt p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-2);
+}
+.gd-judge {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+.gd-judge div {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+  color: var(--text-2);
+}
+/* 꼭 지킬 것 */
+.gd-rule {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 9px 24px;
+  word-break: keep-all;
+}
+.gd-rule .n {
+  width: 24px;
+  height: 24px;
+  border-radius: 12px;
+  flex: none;
+  margin-top: 1px;
+  background: var(--orange-weak);
+  color: var(--orange);
+  font-size: 13px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+}
+.gd-rule b {
+  display: block;
+  font-size: 15px;
+}
+.gd-rule span {
+  display: block;
+  font-size: 13px;
+  color: var(--text-3);
+}

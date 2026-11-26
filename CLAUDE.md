@@ -23,7 +23,7 @@
 - `src/calc/angle.ts` 순수 계산(외판 기울기 환산 · 도면 T.A 경사 포함) · `sign.ts` 선수/선미 → 부호 · 턴오버 · 외판 보정 감싸기 · `basis.ts` 계산 기준(도면/현물 T.A · F.A) · `capcalc.ts` 계산 → 기록 칸 · 지난 기록 다시 계산 · `judge.ts` 판정/표시 · `csv.ts` 내보내기 · `report.ts` 결재용 보고서 정리
 - `src/sensor/tilt.ts` 센서 → 각도 (긴 축 angle · 화면 축 face, EMA + 1초 평균, 안정 판정, |g| 검사, 영점 · 뒷면 보정 · 부호)
 - `src/db/store.ts` IndexedDB (blocks · caps · records) · `draft.ts` 측정 중간 저장(localStorage) · `src/settings.ts` 설정(localStorage)
-- `src/ui/screens/*` 화면 (`ref.tsx` = 현물 기준 재기(FRAME 웹 / LONGL. 라인), `report.tsx` = A4 보고서 · 인쇄) · `src/ui/components/*` 공통 조각 · `src/styles.css` 디자인 토큰 · `src/report.css` 보고서 종이 · 인쇄
+- `src/ui/screens/*` 화면 (`ref.tsx` = 현물 기준 재기(FRAME 웹 / LONGL. 라인), `guide.tsx` = 설명서 탭(용어 시트 · 재는 순서 · 꼭 지킬 것 — 글은 docs 와 같은 내용만), `report.tsx` = A4 보고서 · 인쇄) · `src/ui/components/*` 공통 조각 · `src/styles.css` 디자인 토큰 · `src/report.css` 보고서 종이 · 인쇄
 - `public/sw.js` 오프라인 (빌드 때 파일 목록 자동 주입) · `tools/make_icons.py` 아이콘 · `tools/make_cap_phone.py` 폰 대는 법 입체 그림 → `public/cap-phone.svg`
 - 바텀시트 : 스크롤 잠금 · 폰 뒤로가기(맨 위 시트만 닫기)는 `src/ui/router.ts` 의 열린 시트 목록 하나로 처리
 

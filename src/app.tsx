@@ -1,10 +1,11 @@
-// 앱 틀 : 주소 → 화면, 하단 탭(측정 · 기록 · 설정)
+// 앱 틀 : 주소 → 화면, 하단 탭(측정 · 기록 · 설명서 · 설정)
 import { useEffect } from 'preact/hooks';
 import { useSettings } from './settings';
 import { go, match, useRoute } from './ui/router';
 import { ToastHost } from './ui/components/ui';
-import { ITabMeasure, ITabRecord, ITabSetting } from './ui/icons';
+import { ITabGuide, ITabMeasure, ITabRecord, ITabSetting } from './ui/icons';
 import { HomeScreen } from './ui/screens/home';
+import { GuideCautionScreen, GuideScreen, GuideStepsScreen } from './ui/screens/guide';
 import { BlockScreen } from './ui/screens/block';
 import { CapScreen } from './ui/screens/cap';
 import { LineScreen } from './ui/screens/line';
@@ -32,6 +33,7 @@ function TabBar(p: { path: string }) {
   const tabs = [
     { to: '/', label: '측정', Icon: ITabMeasure },
     { to: '/records', label: '기록', Icon: ITabRecord },
+    { to: '/guide', label: '설명서', Icon: ITabGuide },
     { to: '/settings', label: '설정', Icon: ITabSetting },
   ];
   return (
@@ -61,7 +63,12 @@ export function App() {
   } else if (path === '/records') {
     screen = <RecordsScreen />;
     tab = true;
-  } else if (path === '/settings') {
+  } else if (path === '/guide') {
+    screen = <GuideScreen />;
+    tab = true;
+  } else if (path === '/guide/steps') screen = <GuideStepsScreen />;
+  else if (path === '/guide/caution') screen = <GuideCautionScreen />;
+  else if (path === '/settings') {
     screen = <SettingsScreen />;
     tab = true;
   } else if (path === '/settings/calibrate') screen = <CalibrateScreen />;
@@ -80,7 +87,7 @@ export function App() {
   return (
     <>
       {screen}
-      {tab && <TabBar path={path in { '/': 1, '/records': 1, '/settings': 1 } ? path : '/'} />}
+      {tab && <TabBar path={path in { '/': 1, '/records': 1, '/guide': 1, '/settings': 1 } ? path : '/'} />}
       <ToastHost />
     </>
   );
